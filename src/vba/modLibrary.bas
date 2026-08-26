@@ -22,6 +22,20 @@ Public Const LIB_FIELD_COUNT As Long = 11
 ' second table sharing the same rows.
 Public Const LIB_ROW_CAP As Long = 100000
 
+' Column layout of the Pins table. Declared here, at the top of the module
+' alongside the Connectors columns, rather than next to WritePin/ReadPins -
+' VBA requires a module-level Const to be declared before any Sub/Function
+' that references it, or the compiler reports "Variable not defined" on the
+' constant's own name.
+Public Const PIN_COL_CONNID As Long = 1
+Public Const PIN_COL_PINNUM As Long = 2
+Public Const PIN_COL_LABEL As Long = 3
+Public Const PIN_COL_NORMX As Long = 4
+Public Const PIN_COL_NORMY As Long = 5
+Public Const PIN_COL_LABELX As Long = 6
+Public Const PIN_COL_LABELY As Long = 7
+Public Const PIN_FIELD_COUNT As Long = 7
+
 Public Function LastUsedRowInWindow(ws As Worksheet, ByVal nCol As Long, ByVal nLastRow As Long) As Long
     ' Public: modPinEditor (sub-plan 2b) reuses this for the same bounded-
     ' window-safe single-row delete it needs for "Delete Pin."
@@ -148,4 +162,106 @@ Public Function UniqueConnectorID(wsConn As Worksheet, ByVal nFirstRow As Long, 
     Loop
 
     UniqueConnectorID = sCandidate
+End Function
+
+Public Function WritePin(wsPins As Worksheet, ByVal nFirstRow As Long, _
+                         ByVal nLastRow As Long, ByVal vFields As Variant) As Boolean
+    Dim r As Long, c As Long, nLast As Long
+
+    If UBound(vFields) - LBound(vFields) + 1 <> PIN_FIELD_COUNT Then Exit Function
+
+    nLast = LastUsedRowInWindow(wsPins, PIN_COL_CONNID, nLastRow)
+    If nLast < nFirstRow Then
+        r = nFirstRow
+    Else
+        r = nLast + 1
+    End If
+    If r > nLastRow Then Exit Function
+
+    For c = 1 To PIN_FIELD_COUNT
+        wsPins.Cells(r, c).Value = vFields(LBound(vFields) + c - 1)
+    Next c
+
+    WritePin = True
+End Function
+
+Private Sub SwapPinRows(vRows As Variant, ByVal a As Long, ByVal b As Long)
+    Dim c As Long, vTmp As Variant
+    For c = 1 To PIN_FIELD_COUNT
+        vTmp = vRows(a, c)
+        vRows(a, c) = vRows(b, c)
+        vRows(b, c) = vTmp
+    Next c
+End Sub
+
+Public Function ReadPinsForConnector(wsPins As Worksheet, ByVal nFirstRow As Long, _
+                                     ByVal nLastRow As Long, ByVal sConnectorID As String) As Variant
+    Dim nLast As Long, r As Long, n As Long, i As Long, j As Long
+    Dim vRows() As Variant, vResult() As Variant
+
+    nLast = LastUsedRowInWindow(wsPins, PIN_COL_CONNID, nLastRow)
+    If nLast < nFirstRow Then Exit Function
+
+    n = 0
+    ReDim vRows(1 To nLast - nFirstRow + 1, 1 To PIN_FIELD_COUNT)
+    For r = nFirstRow To nLast
+        If StrComp(Trim$(CStr(wsPins.Cells(r, PIN_COL_CONNID).Value)), sConnectorID, vbTextCompare) = 0 Then
+            n = n + 1
+            For i = 1 To PIN_FIELD_COUNT
+                vRows(n, i) = wsPins.Cells(r, i).Value
+            Next i
+        End If
+    Next r
+    If n = 0 Then Exit Function
+
+    ' Insertion sort by PinNumber - pin counts per connector are small.
+    For i = 2 To n
+        For j = i To 2 Step -1
+            If CDbl(vRows(j, PIN_COL_PINNUM)) < CDbl(vRows(j - 1, PIN_COL_PINNUM)) Then
+                SwapPinRows vRows, j, j - 1
+            Else
+                Exit For
+            End If
+        Next j
+    Next i
+
+    ReDim vResult(1 To n, 1 To PIN_FIELD_COUNT)
+    For i = 1 To n
+        For j = 1 To PIN_FIELD_COUNT
+            vResult(i, j) = vRows(i, j)
+        Next j
+    Next i
+
+    ReadPinsForConnector = vResult
+End Function
+
+Public Function DeletePinsForConnector(wsPins As Worksheet, ByVal nFirstRow As Long, _
+                                       ByVal nLastRow As Long, ByVal sConnectorID As String) As Long
+    Dim nLast As Long, r As Long, w As Long, c As Long, nDeleted As Long
+
+    nLast = LastUsedRowInWindow(wsPins, PIN_COL_CONNID, nLastRow)
+    If nLast < nFirstRow Then Exit Function
+
+    ' Single-pass compaction: copy every non-matching row down to a write
+    ' cursor, then clear the leftover tail. Bounded to [nFirstRow, nLastRow]
+    ' for the same reason DeleteConnector avoids Range.Delete Shift:=xlUp.
+    w = nFirstRow
+    For r = nFirstRow To nLast
+        If StrComp(Trim$(CStr(wsPins.Cells(r, PIN_COL_CONNID).Value)), sConnectorID, vbTextCompare) = 0 Then
+            nDeleted = nDeleted + 1
+        Else
+            If w <> r Then
+                For c = 1 To PIN_FIELD_COUNT
+                    wsPins.Cells(w, c).Value = wsPins.Cells(r, c).Value
+                Next c
+            End If
+            w = w + 1
+        End If
+    Next r
+
+    If w <= nLast Then
+        wsPins.Range(wsPins.Cells(w, 1), wsPins.Cells(nLast, PIN_FIELD_COUNT)).ClearContents
+    End If
+
+    DeletePinsForConnector = nDeleted
 End Function
