@@ -1,0 +1,4 @@
+Private Sub Worksheet_Change(ByVal Target As Range)
+    If Not Application.EnableEvents Then Exit Sub
+    modState.MarkDirty
+End Sub

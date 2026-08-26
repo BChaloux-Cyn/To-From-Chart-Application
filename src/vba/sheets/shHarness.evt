@@ -1,0 +1,35 @@
+Private Const BULK_EDIT_THRESHOLD As Long = 500
+
+Private Sub Worksheet_Change(ByVal Target As Range)
+    Dim cel As Range
+    Dim bEvents As Boolean
+
+    If Not Application.EnableEvents Then Exit Sub
+
+    bEvents = Application.EnableEvents
+    Application.EnableEvents = False
+    On Error GoTo CleanUp
+
+    ' A bulk clear or paste has nothing per-cell worth doing.
+    If Target.Cells.Count > BULK_EDIT_THRESHOLD Then
+        modState.MarkDirty
+        GoTo CleanUp
+    End If
+
+    For Each cel In Target.Cells
+        If cel.Row >= modChart.CHART_FIRST_ROW And cel.Row <= modChart.CHART_LAST_ROW Then
+            If cel.Column = modChart.COL_FROM_CONN Or cel.Column = modChart.COL_TO_CONN Then
+                modChart.RebuildPinValidation cel.Row, cel.Column
+            End If
+            modState.MarkDirty
+        ElseIf cel.Row < modChart.CHART_HEADER_ROW Then
+            If Not Application.Intersect(cel, ThisWorkbook.Names("TB_Units").RefersToRange) Is Nothing Then
+                modChart.SetLengthUnits CStr(cel.Value)
+            End If
+            modState.MarkDirty
+        End If
+    Next cel
+
+CleanUp:
+    Application.EnableEvents = bEvents
+End Sub

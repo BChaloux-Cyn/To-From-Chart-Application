@@ -15,8 +15,13 @@ VBA_DIR = ROOT / "src" / "vba"
 DIST = ROOT / "dist"
 CREATOR_NAME = "HarnessCreator.xlsm"
 
-VBA_MODULES = ["modUtil.bas", "modState.bas", "modConnectors.bas"]
+VBA_MODULES = ["modUtil.bas", "modState.bas", "modConnectors.bas", "modChart.bas"]
 BUILD_VERSION = "0.1.0"
+
+SHEET_EVENTS = [
+    ("shHarness", "shHarness.evt"),
+    ("shConnectors", "shConnectors.evt"),
+]
 
 
 def build(out_dir: Path = DIST) -> Path:
@@ -38,6 +43,9 @@ def build(out_dir: Path = DIST) -> Path:
             layout.build_state(sheets, BUILD_VERSION)
             for name in VBA_MODULES:
                 excel_com.import_module(wb, VBA_DIR / name)
+            for codename, filename in SHEET_EVENTS:
+                source = (VBA_DIR / "sheets" / filename).read_text(encoding="utf-8")
+                excel_com.add_sheet_code(wb, codename, source)
             excel_com.save_as_xlsm(wb, target)
         finally:
             wb.Close(SaveChanges=False)
