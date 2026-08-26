@@ -17,7 +17,7 @@ DIST = ROOT / "dist"
 CREATOR_NAME = "HarnessCreator.xlsm"
 LIBRARY_NAME = "ConnectorLibrary.xlsx"
 
-VBA_MODULES = ["modUtil.bas", "modState.bas", "modConnectors.bas", "modChart.bas"]
+VBA_MODULES = ["modUtil.bas", "modState.bas", "modConnectors.bas", "modChart.bas", "modLibrary.bas"]
 BUILD_VERSION = "0.1.0"
 
 SHEET_EVENTS = [
