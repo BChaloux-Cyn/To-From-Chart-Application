@@ -74,3 +74,31 @@ def test_switching_units_rewrites_the_length_header(wb):
     wb.Names("TB_Units").RefersToRange.Value = "mm"
     assert sheet.Cells(6, 7).Value == "Length (mm)"
     assert run(wb, "modState.GetState", "LengthUnits") == "mm"
+
+
+def test_bulk_paste_rebuilds_pin_dropdowns_without_clearing_pasted_pins(wb):
+    add_four_way(wb)
+    sheet = wb.Worksheets("Harness")
+
+    # 50 rows x 11 columns = 550 cells, above the 500-cell bulk-edit
+    # threshold, in a single Range.Value assignment (one Worksheet_Change).
+    rows = 50
+    first_row = [None] * 11
+    first_row[0] = "J1"
+    first_row[1] = 2
+    data = tuple([tuple(first_row)] + [tuple([None] * 11) for _ in range(rows - 1)])
+    sheet.Range(sheet.Cells(7, 1), sheet.Cells(7 + rows - 1, 11)).Value = data
+
+    assert sheet.Cells(7, 2).Validation.Formula1 == "1,2,3,4"
+    assert sheet.Cells(7, 2).Value == 2
+
+
+def test_editing_pin_count_refreshes_existing_chart_rows(wb):
+    add_four_way(wb)
+    sheet = wb.Worksheets("Harness")
+    sheet.Cells(7, 1).Value = "J1"
+    assert sheet.Cells(7, 2).Validation.Formula1 == "1,2,3,4"
+
+    wb.Worksheets("Connectors").Cells(2, 6).Value = 8
+
+    assert sheet.Cells(7, 2).Validation.Formula1 == "1,2,3,4,5,6,7,8"

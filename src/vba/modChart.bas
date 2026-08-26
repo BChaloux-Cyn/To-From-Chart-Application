@@ -20,7 +20,8 @@ Private Const MAX_FORMULA1 As Long = 255
 Private Const TB_CLEAR_NAMES As String = _
     "TB_Name,TB_Number,TB_Rev,TB_Student,TB_Class,TB_Date,TB_Desc"
 
-Public Sub RebuildPinValidation(ByVal nRow As Long, ByVal nConnCol As Long)
+Public Sub RebuildPinValidation(ByVal nRow As Long, ByVal nConnCol As Long, _
+                                Optional ByVal bClearStale As Boolean = True)
     Dim ws As Worksheet, cel As Range
     Dim nPinCol As Long, nPins As Long, i As Long
     Dim sRef As String, sList As String
@@ -38,7 +39,11 @@ Public Sub RebuildPinValidation(ByVal nRow As Long, ByVal nConnCol As Long)
     nPins = modConnectors.PinCountFor(sRef)
 
     cel.Validation.Delete
-    cel.ClearContents
+    ' A single-cell connector edit invalidates whatever pin was already
+    ' there, so it must be cleared. A bulk paste or a pin-count edit
+    ' elsewhere sets/keeps the pin value deliberately, so it must not be
+    ' wiped out from under the user - only the dropdown list is refreshed.
+    If bClearStale Then cel.ClearContents
     If nPins < 1 Then Exit Sub
 
     For i = 1 To nPins
@@ -76,6 +81,26 @@ Public Sub SetLengthUnits(ByVal sUnit As String)
 
 CleanUp:
     Application.EnableEvents = bEvents
+End Sub
+
+Public Sub RefreshChartRowsForConnector(ByVal sRefDes As String)
+    Dim ws As Worksheet
+    Dim r As Long
+    Dim sRef As String
+
+    If Len(Trim$(sRefDes)) = 0 Then Exit Sub
+
+    Set ws = ThisWorkbook.Worksheets(CHART_SHEET)
+    For r = CHART_FIRST_ROW To CHART_LAST_ROW
+        sRef = Trim$(CStr(ws.Cells(r, COL_FROM_CONN).Value))
+        If StrComp(sRef, sRefDes, vbTextCompare) = 0 Then
+            RebuildPinValidation r, COL_FROM_CONN, False
+        End If
+        sRef = Trim$(CStr(ws.Cells(r, COL_TO_CONN).Value))
+        If StrComp(sRef, sRefDes, vbTextCompare) = 0 Then
+            RebuildPinValidation r, COL_TO_CONN, False
+        End If
+    Next r
 End Sub
 
 Public Sub NewHarness()

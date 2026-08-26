@@ -1,4 +1,26 @@
 Private Sub Worksheet_Change(ByVal Target As Range)
+    Dim bEvents As Boolean
+    Dim rw As Range
+    Dim sRef As String
+
     If Not Application.EnableEvents Then Exit Sub
+
+    bEvents = Application.EnableEvents
+    Application.EnableEvents = False
+    On Error GoTo CleanUp
+
     modState.MarkDirty
+
+    ' A pin-count (or other) edit to an existing connector row must refresh
+    ' any chart rows already referencing it, so their pin dropdowns stay
+    ' in sync with the connector's current pin count.
+    For Each rw In Target.Rows
+        If rw.Row >= modConnectors.CONN_FIRST_ROW Then
+            sRef = Trim$(CStr(Me.Cells(rw.Row, 1).Value))
+            modChart.RefreshChartRowsForConnector sRef
+        End If
+    Next rw
+
+CleanUp:
+    Application.EnableEvents = bEvents
 End Sub
