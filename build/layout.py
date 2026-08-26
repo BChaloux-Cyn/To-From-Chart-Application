@@ -255,3 +255,37 @@ def build_state(sheets, version: str) -> None:
         sheet.Cells(row, 1).Value = key
         sheet.Cells(row, 2).NumberFormat = "@"
         sheet.Cells(row, 2).Value = values[key]
+
+
+MSO_SHAPE_ROUNDED_RECTANGLE = 5
+
+HOME_TEXT = [
+    ("A1", "WIRE HARNESS CREATOR"),
+    ("A3", "This workbook is the editor. It is not a drawing."),
+    ("A4", "Use it to build harness files, which are saved separately as .xlsx."),
+    ("A6", "1. Add the connectors your harness uses on the Connectors sheet."),
+    ("A7", "2. Fill in the to-from chart on the Harness sheet, one row per wire."),
+    ("A8", "3. Pick From Conn first - the From Pin list is built from that connector."),
+    ("A10", "New Harness clears everything and starts over."),
+]
+
+HOME_BUTTONS = [
+    # (caption, macro, left, top, width, height)
+    ("New Harness", "modChart.NewHarness", 20, 220, 120, 32),
+]
+
+
+def build_home(sheets) -> None:
+    sheet = sheets["Home"]
+    for cell, text in HOME_TEXT:
+        sheet.Range(cell).Value = text
+    sheet.Range("A1").Font.Size = 16
+    sheet.Range("A1").Font.Bold = True
+    sheet.Columns(1).ColumnWidth = 90
+
+    for caption, macro, left, top, width, height in HOME_BUTTONS:
+        shape = sheet.Shapes.AddShape(
+            MSO_SHAPE_ROUNDED_RECTANGLE, left, top, width, height
+        )
+        shape.TextFrame2.TextRange.Text = caption
+        shape.OnAction = macro

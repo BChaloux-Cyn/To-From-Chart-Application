@@ -15,6 +15,11 @@ Public Const COL_NOTES As Long = 11
 
 Private Const MAX_FORMULA1 As Long = 255
 
+' Module-level Const/Dim must sit in the declarations section, before any
+' Sub/Function: VBA does not recognize one declared between procedures.
+Private Const TB_CLEAR_NAMES As String = _
+    "TB_Name,TB_Number,TB_Rev,TB_Student,TB_Class,TB_Date,TB_Desc"
+
 Public Sub RebuildPinValidation(ByVal nRow As Long, ByVal nConnCol As Long)
     Dim ws As Worksheet, cel As Range
     Dim nPinCol As Long, nPins As Long, i As Long
@@ -68,6 +73,47 @@ Public Sub SetLengthUnits(ByVal sUnit As String)
     ws.Cells(CHART_HEADER_ROW, COL_LENGTH).Value = "Length (" & s & ")"
     ThisWorkbook.Names("TB_Units").RefersToRange.Value = s
     modState.SetState "LengthUnits", s
+
+CleanUp:
+    Application.EnableEvents = bEvents
+End Sub
+
+Public Sub NewHarness()
+    Dim wsHarness As Worksheet, wsConn As Worksheet, wsCheck As Worksheet
+    Dim vNames As Variant, i As Long
+    Dim bEvents As Boolean
+
+    bEvents = Application.EnableEvents
+    Application.EnableEvents = False
+    On Error GoTo CleanUp
+
+    Set wsHarness = ThisWorkbook.Worksheets(CHART_SHEET)
+    Set wsConn = ThisWorkbook.Worksheets(modConnectors.CONN_SHEET)
+    Set wsCheck = ThisWorkbook.Worksheets("Check")
+
+    wsHarness.Range(wsHarness.Cells(CHART_FIRST_ROW, COL_FROM_CONN), _
+                    wsHarness.Cells(CHART_LAST_ROW, COL_NOTES)).ClearContents
+
+    ' Pin validation is built per row, so it must be torn down per row too.
+    wsHarness.Range(wsHarness.Cells(CHART_FIRST_ROW, COL_FROM_PIN), _
+                    wsHarness.Cells(CHART_LAST_ROW, COL_FROM_PIN)).Validation.Delete
+    wsHarness.Range(wsHarness.Cells(CHART_FIRST_ROW, COL_TO_PIN), _
+                    wsHarness.Cells(CHART_LAST_ROW, COL_TO_PIN)).Validation.Delete
+
+    vNames = Split(TB_CLEAR_NAMES, ",")
+    For i = LBound(vNames) To UBound(vNames)
+        ThisWorkbook.Names(vNames(i)).RefersToRange.ClearContents
+    Next i
+
+    wsConn.Range(wsConn.Cells(modConnectors.CONN_FIRST_ROW, 1), _
+                 wsConn.Cells(wsConn.Rows.Count, 6)).ClearContents
+
+    wsCheck.Range(wsCheck.Cells(2, 1), _
+                  wsCheck.Cells(wsCheck.Rows.Count, 3)).ClearContents
+
+    modState.SetState "HarnessPath", ""
+    SetLengthUnits "in"
+    modState.ClearDirty
 
 CleanUp:
     Application.EnableEvents = bEvents
