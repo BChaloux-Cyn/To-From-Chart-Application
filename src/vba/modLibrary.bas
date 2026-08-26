@@ -116,3 +116,36 @@ Public Function DeleteConnector(wsConn As Worksheet, ByVal nFirstRow As Long, _
 
     DeleteConnector = True
 End Function
+
+Public Function SlugifyConnectorID(ByVal sPartNumber As String, ByVal sName As String) As String
+    Dim sSource As String, sResult As String, i As Long, ch As String
+
+    sSource = Trim$(sPartNumber)
+    If Len(sSource) = 0 Then sSource = Trim$(sName)
+    sSource = UCase$(sSource)
+
+    For i = 1 To Len(sSource)
+        ch = Mid$(sSource, i, 1)
+        If (ch >= "A" And ch <= "Z") Or (ch >= "0" And ch <= "9") Then
+            sResult = sResult & ch
+        Else
+            sResult = sResult & "-"
+        End If
+    Next i
+
+    SlugifyConnectorID = sResult
+End Function
+
+Public Function UniqueConnectorID(wsConn As Worksheet, ByVal nFirstRow As Long, _
+                                  ByVal nLastRow As Long, ByVal sBaseID As String) As String
+    Dim sCandidate As String, nSuffix As Long
+
+    sCandidate = sBaseID
+    nSuffix = 1
+    Do While FindConnectorRow(wsConn, nFirstRow, nLastRow, sCandidate) > 0
+        nSuffix = nSuffix + 1
+        sCandidate = sBaseID & "-" & CStr(nSuffix)
+    Loop
+
+    UniqueConnectorID = sCandidate
+End Function
