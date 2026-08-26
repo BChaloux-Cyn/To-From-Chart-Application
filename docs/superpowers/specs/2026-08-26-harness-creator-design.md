@@ -100,18 +100,22 @@ values.
 
 ### To-from chart columns
 
+Columns are ordered to read along the wire itself: the starting endpoint and
+its terminal, then the wire's own properties, then the far terminal and the
+ending endpoint. Notes is the only column that falls outside that sequence.
+
 | Col | Header | Entry |
 |---|---|---|
 | A | From Conn | Dropdown of ref designators on the `Connectors` sheet |
 | B | From Pin | Dependent dropdown, rebuilt by VBA when column A changes |
-| C | To Conn | Dropdown of ref designators |
-| D | To Pin | Dependent dropdown |
-| E | Signal | Free text |
-| F | Color | Dropdown from `_Lists` |
-| G | AWG | Dropdown from `_Lists` |
-| H | Length (unit) | Number greater than zero |
-| I | Term A | Dropdown from `_Lists` |
-| J | Term B | Dropdown from `_Lists` |
+| C | From Term | Dropdown from `_Lists` |
+| D | Signal | Free text |
+| E | Color | Dropdown from `_Lists` |
+| F | AWG | Dropdown from `_Lists` |
+| G | Length (unit) | Number greater than zero |
+| H | To Term | Dropdown from `_Lists` |
+| I | To Conn | Dropdown of ref designators |
+| J | To Pin | Dependent dropdown, rebuilt by VBA when column I changes |
 | K | Notes | Free text |
 
 There is no wire ID column. A wire is identified by its row position and by
@@ -231,6 +235,11 @@ formula against the hidden join-key columns on the `Harness` sheet, matching
 first as a From endpoint and falling back to a To endpoint. INDEX/MATCH is
 used rather than XLOOKUP so the file works on Excel 2016 and later.
 
+The table is written from this connector's point of view. Wire To is the
+opposite endpoint, and Termination is the terminal on this connector's end -
+From Term when the row matched as a From endpoint, To Term when it matched as
+a To endpoint.
+
 Because the pin tables are live formulas, a student who opens a saved harness
 and corrects a length, color, gauge, termination, or signal sees the
 connector pages update with no macros involved. Callout markers are static
@@ -266,8 +275,8 @@ Unsaved-change tracking lives in `_State` and is set by any edit to the
 
 Reported as errors:
 
-- Missing From Conn, From Pin, To Conn, To Pin, Color, AWG, Length, Term A,
-  or Term B on a used row
+- Missing From Conn, From Pin, From Term, Color, AWG, Length, To Term,
+  To Conn, or To Pin on a used row
 - An endpoint referencing a connector not present in the snapshot
 - A pin number outside 1 to PinCount
 - The same connector and pin used on more than one row
