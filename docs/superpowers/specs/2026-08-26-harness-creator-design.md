@@ -98,6 +98,39 @@ Length Units is a workbook-level setting. Changing it rewrites the Length
 column header to `Length (in)` or `Length (mm)`. It does not convert existing
 values.
 
+### Connector instances and reference designators
+
+Two identifiers do different jobs. **ConnectorID** names a part type in the
+library and is shared by every harness that uses that part. **Ref Des** names
+one physical connector in one harness, and is what appears in the From Conn
+and To Conn dropdowns, titles the connector page, and labels the photo on the
+drawing.
+
+Because the ref des is the instance key, a harness can use the same library
+part more than once. Two `DTM-04P` bodies become `J1` and `J2`, each with its
+own page, its own photo, and its own pin usage, both resolving to a single
+library definition.
+
+A harness may have any number of connectors, including one. Nothing in the
+design assumes two endpoints of different kinds; a single connector with
+flying leads is a valid harness whose far ends are `Tail`, `Stud`, or
+`Splice` entries.
+
+The `Connectors` sheet holds one row per instance: Ref Des, ConnectorID,
+Name, Part Number, Type, Pin Count. Adding a connector auto-assigns the next
+free ref des using a prefix chosen by the library entry's Type:
+
+| Type | Prefix | Example |
+|---|---|---|
+| `Connector` | `J` | `J1`, `J2` |
+| `Stud` | `ST` | `ST1` |
+| `Splice` | `SP` | `SP1` |
+| `Tail` | `TL` | `TL1` |
+
+The assigned ref des is editable. Renaming one rewrites every reference to it
+in the chart. Ref designators must be unique within a harness; a rename that
+collides is rejected.
+
 ### To-from chart columns
 
 Columns are ordered to read along the wire itself: the starting endpoint and
@@ -315,7 +348,6 @@ Reported as errors:
   To Conn, or To Pin on a used row
 - An endpoint referencing a connector not present in the snapshot
 - A pin number outside 1 to PinCount
-- The same connector and pin used on more than one row
 - From endpoint identical to To endpoint
 - Length not numeric or not greater than zero
 
@@ -360,6 +392,10 @@ pytest drives Excel COM against the built artifact.
 - **VBA units**: pure functions called directly through `Application.Run` -
   ID slugification, normalized-coordinate math, join-key construction, unit
   header text.
+- **Ref designators**: adding connectors of each type assigns the expected
+  prefix and next free number; adding the same library part twice yields two
+  distinct instances resolving to one definition; renaming a ref des rewrites
+  every chart reference; a colliding rename is rejected.
 - **Library round trip**: write connectors and pins, save, reopen, assert
   equality; import a second library and assert merge and collision behavior.
 - **Render**: build a harness with two connectors and several wires, save,
@@ -408,6 +444,10 @@ have caught it.
 ## Out of scope
 
 - Auto-drawn harness diagram (phase 5, deferred)
+- Duplicate-endpoint checking. Two wires landing on the same connector pin is
+  not reported. The rule is only correct for `Connector` endpoints - studs
+  and splices are multi-drop by nature - and the type-aware version is not
+  worth building until the simpler checks have been used in a classroom.
 - Wire bundle or branch modeling, and overall harness length calculations
 - Bill of materials generation
 - Any non-Windows or Excel-for-web support
