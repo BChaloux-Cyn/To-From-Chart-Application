@@ -36,6 +36,11 @@ Public Const PIN_COL_LABELX As Long = 6
 Public Const PIN_COL_LABELY As Long = 7
 Public Const PIN_FIELD_COUNT As Long = 7
 
+Public Const PHOTO_GRID_COLUMNS As Long = 4
+Public Const PHOTO_GRID_CELL_WIDTH As Long = 120
+Public Const PHOTO_GRID_CELL_HEIGHT As Long = 120
+Public Const PHOTO_GRID_MARGIN As Long = 8
+
 Public Function LastUsedRowInWindow(ws As Worksheet, ByVal nCol As Long, ByVal nLastRow As Long) As Long
     ' Public: modPinEditor (sub-plan 2b) reuses this for the same bounded-
     ' window-safe single-row delete it needs for "Delete Pin."
@@ -264,4 +269,43 @@ Public Function DeletePinsForConnector(wsPins As Worksheet, ByVal nFirstRow As L
     End If
 
     DeletePinsForConnector = nDeleted
+End Function
+
+Public Sub RemoveConnectorPhoto(wsPhotos As Worksheet, ByVal sConnectorID As String)
+    On Error Resume Next
+    wsPhotos.Shapes("PHOTO_" & sConnectorID).Delete
+    On Error GoTo 0
+End Sub
+
+Public Function EmbedConnectorPhoto(wsPhotos As Worksheet, ByVal sConnectorID As String, _
+                                    ByVal sImagePath As String) As String
+    Dim sShapeName As String, nIndex As Long, nCol As Long, nRow As Long
+    Dim shp As Shape
+
+    If Len(Dir$(sImagePath)) = 0 Then Exit Function
+
+    sShapeName = "PHOTO_" & sConnectorID
+    RemoveConnectorPhoto wsPhotos, sConnectorID
+
+    nIndex = wsPhotos.Shapes.Count
+    nCol = nIndex Mod PHOTO_GRID_COLUMNS
+    nRow = nIndex \ PHOTO_GRID_COLUMNS
+
+    Set shp = wsPhotos.Shapes.AddPicture(sImagePath, False, True, _
+        nCol * PHOTO_GRID_CELL_WIDTH, nRow * PHOTO_GRID_CELL_HEIGHT, _
+        PHOTO_GRID_CELL_WIDTH - PHOTO_GRID_MARGIN, PHOTO_GRID_CELL_HEIGHT - PHOTO_GRID_MARGIN)
+    shp.Name = sShapeName
+
+    EmbedConnectorPhoto = sShapeName
+End Function
+
+Public Function CachePhotoPath(ByVal sWorkbookFolder As String, ByVal sConnectorID As String) As String
+    Dim sFolder As String
+
+    sFolder = sWorkbookFolder
+    If Right$(sFolder, 1) <> "\" Then sFolder = sFolder & "\"
+    sFolder = sFolder & "Photos\"
+    If Len(Dir$(sFolder, vbDirectory)) = 0 Then MkDir sFolder
+
+    CachePhotoPath = sFolder & sConnectorID & ".png"
 End Function
