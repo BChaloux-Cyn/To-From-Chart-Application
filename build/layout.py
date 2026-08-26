@@ -210,3 +210,48 @@ def build_chart_validation(sheets) -> None:
             )
             target.Validation.InCellDropdown = True
         target.Validation.IgnoreBlank = True
+
+
+CONN_HEADERS = ["Ref Des", "ConnectorID", "Name", "Part Number", "Type", "Pin Count"]
+CONN_COLUMN_WIDTHS = [10, 16, 28, 18, 12, 10]
+CONN_FIRST_ROW = 2
+
+CHECK_HEADERS = ["Row", "Severity", "Message"]
+CHECK_COLUMN_WIDTHS = [8, 12, 80]
+
+STATE_KEYS = ["BuildVersion", "HarnessPath", "Dirty", "LengthUnits", "TestMode"]
+STATE_DEFAULTS = {
+    "HarnessPath": "",
+    "Dirty": "FALSE",
+    "LengthUnits": "in",
+    "TestMode": "FALSE",
+}
+
+
+def _build_header_sheet(sheet, headers, widths) -> None:
+    for index, header in enumerate(headers, start=1):
+        cell = sheet.Cells(1, index)
+        cell.Value = header
+        cell.Font.Bold = True
+        cell.Interior.Color = 0xD9D9D9
+        sheet.Columns(index).ColumnWidth = widths[index - 1]
+
+
+def build_connectors(sheets) -> None:
+    _build_header_sheet(sheets["Connectors"], CONN_HEADERS, CONN_COLUMN_WIDTHS)
+
+
+def build_check(sheets) -> None:
+    _build_header_sheet(sheets["Check"], CHECK_HEADERS, CHECK_COLUMN_WIDTHS)
+
+
+def build_state(sheets, version: str) -> None:
+    sheet = sheets["_State"]
+    sheet.Cells(1, 1).Value = "Key"
+    sheet.Cells(1, 2).Value = "Value"
+    values = dict(STATE_DEFAULTS, BuildVersion=version)
+    for offset, key in enumerate(STATE_KEYS):
+        row = offset + 2
+        sheet.Cells(row, 1).Value = key
+        sheet.Cells(row, 2).NumberFormat = "@"
+        sheet.Cells(row, 2).Value = values[key]
