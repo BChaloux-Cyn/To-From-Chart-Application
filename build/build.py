@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import excel_com
+import layout
 
 ROOT = Path(__file__).resolve().parents[1]
 VBA_DIR = ROOT / "src" / "vba"
@@ -25,6 +26,7 @@ def build(out_dir: Path = DIST) -> Path:
     with excel_com.excel_app() as app:
         wb = app.Workbooks.Add()
         try:
+            layout.build_sheets(wb, excel_com.set_codename)
             for name in VBA_MODULES:
                 excel_com.import_module(wb, VBA_DIR / name)
             excel_com.save_as_xlsm(wb, target)

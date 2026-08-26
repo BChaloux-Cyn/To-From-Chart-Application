@@ -31,7 +31,8 @@ def artifact() -> Path:
 
 @pytest.fixture(scope="session")
 def app():
-    application = win32.Dispatch("Excel.Application")
+    # EnsureDispatch (early-bound), not Dispatch: see excel_com.excel_app().
+    application = win32.gencache.EnsureDispatch("Excel.Application")
     application.Visible = False
     application.DisplayAlerts = False
     application.AutomationSecurity = MSO_AUTOMATION_SECURITY_LOW

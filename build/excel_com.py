@@ -36,7 +36,10 @@ VBOM_INSTRUCTIONS = (
 @contextlib.contextmanager
 def excel_app():
     """Yield a hidden Excel Application and guarantee it is closed."""
-    app = win32.Dispatch("Excel.Application")
+    # EnsureDispatch (early-bound) is required, not Dispatch: late-bound
+    # dispatch fails to resolve named arguments like Worksheets.Add(After=...),
+    # silently inserting at the front instead.
+    app = win32.gencache.EnsureDispatch("Excel.Application")
     app.Visible = False
     app.DisplayAlerts = False
     app.AutomationSecurity = MSO_AUTOMATION_SECURITY_LOW
