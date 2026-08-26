@@ -169,3 +169,44 @@ def build_harness(sheets) -> None:
 def build_title_block_names(wb, sheets) -> None:
     for name, cell in TB_NAMES.items():
         wb.Names.Add(Name=name, RefersTo=f"='Harness'!${cell[0]}${cell[1:]}")
+
+
+XL_VALIDATE_DECIMAL = 2
+XL_GREATER = 5
+
+# (column index, validation type, Formula1)
+CHART_VALIDATION = [
+    (1, XL_VALIDATE_LIST, "=ListRefDes"),
+    (3, XL_VALIDATE_LIST, "=ListTermination"),
+    (5, XL_VALIDATE_LIST, "=ListColor"),
+    (6, XL_VALIDATE_LIST, "=ListAWG"),
+    (7, XL_VALIDATE_DECIMAL, "0"),
+    (8, XL_VALIDATE_LIST, "=ListTermination"),
+    (9, XL_VALIDATE_LIST, "=ListRefDes"),
+]
+
+
+def build_chart_validation(sheets) -> None:
+    sheet = sheets["Harness"]
+    for column, vtype, formula in CHART_VALIDATION:
+        target = sheet.Range(
+            sheet.Cells(CHART_FIRST_ROW, column),
+            sheet.Cells(CHART_LAST_ROW, column),
+        )
+        target.Validation.Delete()
+        if vtype == XL_VALIDATE_DECIMAL:
+            target.Validation.Add(
+                Type=vtype,
+                AlertStyle=XL_VALID_ALERT_STOP,
+                Operator=XL_GREATER,
+                Formula1=formula,
+            )
+        else:
+            target.Validation.Add(
+                Type=vtype,
+                AlertStyle=XL_VALID_ALERT_STOP,
+                Operator=XL_BETWEEN,
+                Formula1=formula,
+            )
+            target.Validation.InCellDropdown = True
+        target.Validation.IgnoreBlank = True
