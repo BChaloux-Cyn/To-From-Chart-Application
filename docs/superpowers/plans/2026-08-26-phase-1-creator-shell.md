@@ -81,7 +81,7 @@ Proves the whole toolchain end to end: Python creates a workbook, injects VBA fr
   - VBA `modUtil.JoinKey(sConn, vPin) As String` returns `"J1|3"` form
   - pytest fixtures `artifact`, `app`, `wb`, and helper `run(wb, macro, *args)`
 
-- [ ] **Step 1: Install dependencies**
+- [x] **Step 1: Install dependencies**
 
 Create `requirements.txt`:
 
@@ -96,7 +96,7 @@ Run:
 python -m pip install -r requirements.txt
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 Create `tests/test_build.py`:
 
@@ -117,7 +117,7 @@ def test_join_key_normalizes_case_and_whitespace(wb):
     assert run(wb, "modUtil.JoinKey", " j1 ", 3) == "J1|3"
 ```
 
-- [ ] **Step 3: Run the test to verify it fails**
+- [x] **Step 3: Run the test to verify it fails**
 
 Run:
 
@@ -127,7 +127,7 @@ python -m pytest tests/test_build.py -v
 
 Expected: FAIL — `tests/conftest.py` does not exist, collection error.
 
-- [ ] **Step 4: Write the COM helpers**
+- [x] **Step 4: Write the COM helpers**
 
 Create `build/excel_com.py`:
 
@@ -203,7 +203,7 @@ def save_as_xlsm(wb, path: Path) -> None:
     wb.SaveAs(Filename=str(path), FileFormat=XL_OPENXML_MACRO_ENABLED)
 ```
 
-- [ ] **Step 5: Write the VBA utility module**
+- [x] **Step 5: Write the VBA utility module**
 
 Create `src/vba/modUtil.bas`. The `Attribute VB_Name` line is required — `Import` uses it to name the module.
 
@@ -222,7 +222,7 @@ Public Function JoinKey(ByVal sConn As String, ByVal vPin As Variant) As String
 End Function
 ```
 
-- [ ] **Step 6: Write the build orchestrator**
+- [x] **Step 6: Write the build orchestrator**
 
 Create `build/build.py`:
 
@@ -286,7 +286,7 @@ if __name__ == "__main__":
     raise SystemExit(main())
 ```
 
-- [ ] **Step 7: Write the test fixtures**
+- [x] **Step 7: Write the test fixtures**
 
 Create `tests/conftest.py`:
 
@@ -350,7 +350,7 @@ Create an empty `tests/__init__.py` so `from tests.conftest import run` resolves
 touch tests/__init__.py
 ```
 
-- [ ] **Step 8: Run the tests to verify they pass**
+- [x] **Step 8: Run the tests to verify they pass**
 
 Run:
 
@@ -360,7 +360,7 @@ python -m pytest tests/test_build.py -v
 
 Expected: 3 passed. If the run stops with the Trust Center message, enable the setting and re-run.
 
-- [ ] **Step 9: Add .gitignore entries and commit**
+- [x] **Step 9: Add .gitignore entries and commit**
 
 `dist/` is already ignored. Verify `__pycache__/` and `.pytest_cache/` are too, then commit.
 
@@ -385,7 +385,7 @@ git commit -m "feat: build toolchain producing an xlsm with imported VBA"
   - `layout.VISIBLE = -1`, `layout.VERY_HIDDEN = 2`
   - `layout.build_sheets(wb) -> dict[str, object]` — creates every sheet, sets code names and visibility, deletes Excel's default sheets, returns a `{tab_name: worksheet}` map
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/test_sheets.py`:
 
@@ -419,7 +419,7 @@ def test_sheet_order_matches_spec(wb):
     assert actual == [tab for tab, _, _ in EXPECTED]
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run:
 
@@ -429,7 +429,7 @@ python -m pytest tests/test_sheets.py -v
 
 Expected: FAIL — the workbook has one default sheet named `Sheet1`.
 
-- [ ] **Step 3: Write the layout module**
+- [x] **Step 3: Write the layout module**
 
 Create `build/layout.py`:
 
@@ -478,7 +478,7 @@ def build_sheets(wb, set_codename) -> dict:
     return sheets
 ```
 
-- [ ] **Step 4: Wire the layout into the build**
+- [x] **Step 4: Wire the layout into the build**
 
 In `build/build.py`, add `import layout` beside `import excel_com`, and replace the body of the `with excel_com.excel_app()` block's `try` so sheets are built before the save:
 
@@ -492,7 +492,7 @@ In `build/build.py`, add `import layout` beside `import excel_com`, and replace 
             wb.Close(SaveChanges=False)
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run:
 
@@ -502,7 +502,7 @@ python -m pytest tests/test_sheets.py tests/test_build.py -v
 
 Expected: all passed.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add build/layout.py build/build.py tests/test_sheets.py
@@ -527,7 +527,7 @@ git commit -m "feat: create Creator sheet skeleton with code names and visibilit
 
 Each list name is a dynamic `OFFSET`/`COUNTA` range. `MAX(1, ...)` guards the zero-row case: an `OFFSET` of height 0 is an error, and data validation bound to an erroring name fails outright.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/test_lists.py`:
 
@@ -581,7 +581,7 @@ def test_refdes_name_survives_an_empty_connector_sheet(wb):
     assert wb.Names("ListRefDes").RefersToRange.Rows.Count == 1
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run:
 
@@ -591,7 +591,7 @@ python -m pytest tests/test_lists.py -v
 
 Expected: FAIL — `_Lists` is empty and the names do not exist.
 
-- [ ] **Step 3: Add list data and names to the layout**
+- [x] **Step 3: Add list data and names to the layout**
 
 Append to `build/layout.py`:
 
@@ -651,7 +651,7 @@ def build_names(wb) -> None:
 
 `Connectors` column A is empty at build time, which is exactly the case `MAX(1, ...)` exists to survive.
 
-- [ ] **Step 4: Wire into the build**
+- [x] **Step 4: Wire into the build**
 
 In `build/build.py`, inside the `try` block, after `layout.build_sheets(...)`:
 
@@ -661,7 +661,7 @@ In `build/build.py`, inside the `try` block, after `layout.build_sheets(...)`:
             layout.build_names(wb)
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run:
 
@@ -671,7 +671,7 @@ python -m pytest tests/test_lists.py -v
 
 Expected: 7 passed.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add build/layout.py build/build.py tests/test_lists.py
@@ -698,7 +698,7 @@ git commit -m "feat: seed pick lists and dynamic named ranges"
 
 Title block names exist so VBA and tests address fields by meaning rather than by cell address, which keeps later phases from breaking when the layout shifts.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/test_titleblock.py`:
 
@@ -740,7 +740,7 @@ def test_units_cell_offers_both_options(wb):
     assert wb.Names("TB_Units").RefersToRange.Validation.Formula1 == "in,mm"
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run:
 
@@ -750,7 +750,7 @@ python -m pytest tests/test_titleblock.py -v
 
 Expected: FAIL — the Harness sheet is empty and the names do not exist.
 
-- [ ] **Step 3: Add the harness layout**
+- [x] **Step 3: Add the harness layout**
 
 Append to `build/layout.py`:
 
@@ -831,7 +831,7 @@ def build_title_block_names(wb, sheets) -> None:
         wb.Names.Add(Name=name, RefersTo=f"='Harness'!${cell[0]}${cell[1:]}")
 ```
 
-- [ ] **Step 4: Wire into the build**
+- [x] **Step 4: Wire into the build**
 
 In `build/build.py`, inside the `try` block after `layout.build_names(wb)`:
 
@@ -840,7 +840,7 @@ In `build/build.py`, inside the `try` block after `layout.build_names(wb)`:
             layout.build_title_block_names(wb, sheets)
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run:
 
@@ -850,7 +850,7 @@ python -m pytest tests/test_titleblock.py -v
 
 Expected: 22 passed.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add build/layout.py build/build.py tests/test_titleblock.py
@@ -872,7 +872,7 @@ git commit -m "feat: lay out harness title block and to-from chart headers"
 
 Pin columns (B and J) get no validation at build time — they are populated per row by VBA in Task 7, because the allowed values depend on which connector the row references.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/test_validation.py`:
 
@@ -922,7 +922,7 @@ def test_free_text_columns_have_no_validation(wb, column):
         _ = cell.Validation.Type
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run:
 
@@ -932,7 +932,7 @@ python -m pytest tests/test_validation.py -v
 
 Expected: the `test_first_data_row_validation` and `test_last_data_row_validation` cases FAIL; the two "no validation" cases already pass.
 
-- [ ] **Step 3: Add validation to the layout**
+- [x] **Step 3: Add validation to the layout**
 
 Append to `build/layout.py`:
 
@@ -978,7 +978,7 @@ def build_chart_validation(sheets) -> None:
         target.Validation.IgnoreBlank = True
 ```
 
-- [ ] **Step 4: Wire into the build**
+- [x] **Step 4: Wire into the build**
 
 In `build/build.py`, after `layout.build_title_block_names(wb, sheets)`:
 
@@ -986,7 +986,7 @@ In `build/build.py`, after `layout.build_title_block_names(wb, sheets)`:
             layout.build_chart_validation(sheets)
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run:
 
@@ -996,7 +996,7 @@ python -m pytest tests/test_validation.py -v
 
 Expected: 18 passed.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add build/layout.py build/build.py tests/test_validation.py
@@ -1026,7 +1026,7 @@ git commit -m "feat: apply pick-list and length validation to chart columns"
   - VBA `modConnectors.AddConnectorInstance(sConnectorID, sName, sPartNumber, sType, nPinCount) As String` — returns the assigned ref des, or `""` when the type is unknown or the pin count is below 1
   - VBA `modConnectors.PinCountFor(sRefDes) As Long` — `0` when not found
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/test_state.py`:
 
@@ -1163,7 +1163,7 @@ def test_ref_des_dropdown_sees_added_connectors(wb):
     assert wb.Names("ListRefDes").RefersToRange.Rows.Count == 2
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run:
 
@@ -1173,7 +1173,7 @@ python -m pytest tests/test_state.py tests/test_connectors.py -v
 
 Expected: FAIL — the headers are absent and neither VBA module exists.
 
-- [ ] **Step 3: Write the state module**
+- [x] **Step 3: Write the state module**
 
 Create `src/vba/modState.bas`:
 
@@ -1238,7 +1238,7 @@ Public Function IsTestMode() As Boolean
 End Function
 ```
 
-- [ ] **Step 4: Write the connectors module**
+- [x] **Step 4: Write the connectors module**
 
 Create `src/vba/modConnectors.bas`:
 
@@ -1340,7 +1340,7 @@ Public Function PinCountFor(ByVal sRefDes As String) As Long
 End Function
 ```
 
-- [ ] **Step 5: Add the remaining sheet layouts**
+- [x] **Step 5: Add the remaining sheet layouts**
 
 Append to `build/layout.py`:
 
@@ -1390,7 +1390,7 @@ def build_state(sheets, version: str) -> None:
         sheet.Cells(row, 2).Value = values[key]
 ```
 
-- [ ] **Step 6: Wire into the build**
+- [x] **Step 6: Wire into the build**
 
 In `build/build.py`, extend the module list and the build body:
 
@@ -1407,7 +1407,7 @@ and after `layout.build_chart_validation(sheets)`:
             layout.build_state(sheets, BUILD_VERSION)
 ```
 
-- [ ] **Step 7: Run the tests to verify they pass**
+- [x] **Step 7: Run the tests to verify they pass**
 
 Run:
 
@@ -1417,7 +1417,7 @@ python -m pytest tests/test_state.py tests/test_connectors.py -v
 
 Expected: all passed.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add build/layout.py build/build.py src/vba/modState.bas src/vba/modConnectors.bas tests/test_state.py tests/test_connectors.py
@@ -1446,7 +1446,7 @@ git commit -m "feat: add connector instances with type-based ref des allocation"
 
 Two behaviours matter and are easy to get wrong. First, the handler must disable events before it writes, because clearing a pin cell would otherwise re-enter the handler. Second, a pin list longer than 255 characters exceeds Excel's `Formula1` limit, so large connectors fall back to whole-number validation.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/test_pin_dropdown.py`:
 
@@ -1529,7 +1529,7 @@ def test_switching_units_rewrites_the_length_header(wb):
     assert run(wb, "modState.GetState", "LengthUnits") == "mm"
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run:
 
@@ -1539,7 +1539,7 @@ python -m pytest tests/test_pin_dropdown.py -v
 
 Expected: FAIL — no event handler exists, so nothing responds to the writes.
 
-- [ ] **Step 3: Write the chart module**
+- [x] **Step 3: Write the chart module**
 
 Create `src/vba/modChart.bas`:
 
@@ -1620,7 +1620,7 @@ CleanUp:
 End Sub
 ```
 
-- [ ] **Step 4: Write the sheet event handlers**
+- [x] **Step 4: Write the sheet event handlers**
 
 Create `src/vba/sheets/shHarness.evt`:
 
@@ -1671,7 +1671,7 @@ Private Sub Worksheet_Change(ByVal Target As Range)
 End Sub
 ```
 
-- [ ] **Step 5: Teach the build to inject sheet code**
+- [x] **Step 5: Teach the build to inject sheet code**
 
 In `build/build.py`, add the event list and inject after the module import:
 
@@ -1692,7 +1692,7 @@ and inside the `try` block, after the `import_module` loop:
                 excel_com.add_sheet_code(wb, codename, source)
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run:
 
@@ -1702,7 +1702,7 @@ python -m pytest tests/test_pin_dropdown.py -v
 
 Expected: 8 passed.
 
-- [ ] **Step 7: Run the whole suite**
+- [x] **Step 7: Run the whole suite**
 
 Run:
 
@@ -1712,7 +1712,7 @@ python -m pytest -v
 
 Expected: everything passes. A failure here means the event handler is firing during another test's setup — check the `EnableEvents` guard.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/vba/modChart.bas src/vba/sheets/ build/build.py tests/test_pin_dropdown.py
@@ -1736,7 +1736,7 @@ git commit -m "feat: rebuild pin dropdowns from the referenced connector"
   - `layout.HOME_TEXT: list[tuple[str, str]]` — `(cell, text)`
   - `layout.build_home(sheets) -> None` placing the instructions and a New Harness button
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/test_new_harness.py`:
 
@@ -1818,7 +1818,7 @@ def test_home_sheet_has_a_new_harness_button(wb):
     assert "modChart.NewHarness" in actions
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run:
 
@@ -1828,7 +1828,7 @@ python -m pytest tests/test_new_harness.py -v
 
 Expected: FAIL — `NewHarness` does not exist and Home has no shapes.
 
-- [ ] **Step 3: Implement New Harness**
+- [x] **Step 3: Implement New Harness**
 
 Append to `src/vba/modChart.bas`:
 
@@ -1880,7 +1880,7 @@ End Sub
 
 `SetLengthUnits` toggles `EnableEvents` itself and restores it to whatever it found, so calling it from inside this guarded block is safe.
 
-- [ ] **Step 4: Build the Home sheet**
+- [x] **Step 4: Build the Home sheet**
 
 Append to `build/layout.py`:
 
@@ -1919,7 +1919,7 @@ def build_home(sheets) -> None:
         shape.OnAction = macro
 ```
 
-- [ ] **Step 5: Wire into the build**
+- [x] **Step 5: Wire into the build**
 
 In `build/build.py`, after `layout.build_state(sheets, BUILD_VERSION)`:
 
@@ -1927,7 +1927,7 @@ In `build/build.py`, after `layout.build_state(sheets, BUILD_VERSION)`:
             layout.build_home(sheets)
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run:
 
@@ -1937,7 +1937,7 @@ python -m pytest tests/test_new_harness.py -v
 
 Expected: 8 passed.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/vba/modChart.bas build/layout.py build/build.py tests/test_new_harness.py
@@ -1956,7 +1956,7 @@ git commit -m "feat: add New Harness command and Home sheet"
 - Consumes: everything above.
 - Produces: nothing later tasks depend on.
 
-- [ ] **Step 1: Run the whole suite from a clean build**
+- [x] **Step 1: Run the whole suite from a clean build**
 
 ```bash
 rm -rf dist
@@ -1965,7 +1965,7 @@ python -m pytest -v
 
 Expected: every test passes and `dist/HarnessCreator.xlsm` is regenerated. If Excel processes are left running, `excel_app()` is not reaching its `finally` — fix that before continuing.
 
-- [ ] **Step 2: Verify the prerequisite check reports correctly**
+- [x] **Step 2: Verify the prerequisite check reports correctly**
 
 ```bash
 python build/build.py --check
@@ -1973,7 +1973,7 @@ python build/build.py --check
 
 Expected: `Prerequisites OK.` and exit code 0.
 
-- [ ] **Step 3: Write the README**
+- [x] **Step 3: Write the README**
 
 Create `README.md`:
 
@@ -2036,7 +2036,7 @@ load with rendered connector pages, validation and export) are specified but
 not yet built. See the spec for the full design.
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add README.md
