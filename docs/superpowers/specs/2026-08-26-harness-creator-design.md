@@ -162,8 +162,18 @@ one writer serve all three.
 | ConnectorID | Foreign key |
 | PinNumber | Integer, 1 to PinCount |
 | PinLabel | Free text, may be blank |
-| NormX | 0.0 to 1.0, fraction of photo width |
-| NormY | 0.0 to 1.0, fraction of photo height |
+| NormX | Anchor point, 0.0 to 1.0, fraction of photo width |
+| NormY | Anchor point, 0.0 to 1.0, fraction of photo height |
+| LabelX | Marker center, 0.0 to 1.0, fraction of photo width |
+| LabelY | Marker center, 0.0 to 1.0, fraction of photo height |
+
+Every pin carries two positions: the anchor point, which is the cavity on the
+connector face, and the marker position, which is where the numbered circle
+is drawn. When a pin is first placed the two are identical and the marker
+sits directly on the point. When the marker is pulled away far enough that it
+no longer covers its anchor, a leader line is drawn between them. Both pairs
+are normalized, so the relationship survives any change of display or print
+scale.
 
 `Photos`: one picture per connector, laid out in a grid, each shape named
 `PHOTO_<ConnectorID>`.
@@ -194,7 +204,7 @@ Opened from Manage Library. A UserForm constructed in code at build time.
 
 Fields: Name, Manufacturer, Part Number, Type, Pin Count, Notes.
 Controls: Load Photo, an Image control, a pin list, Place Pins toggle,
-Delete Pin, Clear Pins, Save, Cancel.
+Delete Pin, Clear Pins, Snap Label to Pin, Save, Cancel.
 
 ### Click-to-place
 
@@ -206,9 +216,28 @@ compensate for.
 
 With Place Pins active, each `MouseUp` on the Image control drops the next
 pin number at that point, recorded as `NormX = X / Control.Width` and
-`NormY = Y / Control.Height`. Markers are numbered Label controls added at
-runtime. Selecting a pin in the list and clicking the image again moves that
-pin instead of adding a new one.
+`NormY = Y / Control.Height`, with `LabelX` and `LabelY` set to match.
+Markers are numbered Label controls added at runtime.
+
+### Moving a marker versus moving a pin
+
+The two gestures do different things, which is why both exist.
+
+- **Dragging a marker** moves the label only. The anchor point stays on the
+  cavity and a leader line appears once the marker clears it. This is how a
+  student pulls numbers off a crowded connector face into the margin.
+- **Selecting a pin in the list and clicking the image** moves the anchor
+  point - the student is correcting where the pin actually is. If the marker
+  was still sitting on its anchor it travels with it; if it had been pulled
+  away, it stays put and the leader re-aims.
+- **Snap Label to Pin** returns the selected pin's marker to its anchor,
+  removing the leader.
+
+Dragging is the primary gesture because it is what a student will try
+unprompted. Runtime-created markers get their mouse events through a small
+`WithEvents` wrapper class held in a collection, one instance per marker.
+Drag is `MouseDown` to record the grab offset, `MouseMove` while the button
+is held to reposition, `MouseUp` to commit.
 
 Because positions are stored normalized, they survive any later change to
 display size or print scale.
@@ -225,9 +254,16 @@ Saving a harness writes a new workbook containing:
 ### Connector page layout
 
 The photo is placed at a fixed anchor, scaled to a fixed maximum width with
-height following its aspect ratio. For each pin, an oval shape is centered at
-`photo.Left + NormX * photo.Width`, `photo.Top + NormY * photo.Height`, with
-the pin number as its text, white fill and black border.
+height following its aspect ratio. For each pin, an oval shape carrying the
+pin number is centered at
+`photo.Left + LabelX * photo.Width`, `photo.Top + LabelY * photo.Height`,
+with white fill and black border.
+
+When the distance between the marker center and the anchor point exceeds the
+marker's radius - that is, when the marker no longer covers its own anchor -
+a thin leader line is drawn from the marker's edge to
+`photo.Left + NormX * photo.Width`, `photo.Top + NormY * photo.Height`.
+Markers left sitting on their anchors get no leader.
 
 Beside the photo, a pin table with columns Pin, Label, Wire To, Signal,
 Color, AWG, Termination, Length. Every cell in that table is an INDEX/MATCH
@@ -328,8 +364,10 @@ pytest drives Excel COM against the built artifact.
   equality; import a second library and assert merge and collision behavior.
 - **Render**: build a harness with two connectors and several wires, save,
   reopen, assert the `CONN_` sheets exist, that oval count equals pin count,
-  that oval positions match the normalized coordinates within tolerance, and
-  that pin-table formulas evaluate to the expected wire data.
+  that oval positions match the stored marker coordinates within tolerance,
+  and that pin-table formulas evaluate to the expected wire data. Assert a
+  leader line is drawn for a pin whose marker was offset from its anchor, and
+  that no leader exists for a pin whose marker sits on its anchor.
 - **Validation**: seed each error class and assert it appears on `Check`.
 - **Export**: export a PDF and assert the file exists and is non-trivial.
 
@@ -364,6 +402,7 @@ have caught it.
 | No wire ID column | Chosen by the user. Rows are identified by position and endpoints. |
 | Pin tables as live formulas | Lets a saved harness stay useful and self-correcting without macros. |
 | Normalized pin coordinates | Callouts survive resizing and print scaling. |
+| Separate anchor and marker positions per pin | Lets a student pull numbers off a crowded connector face without lying about where the pin is. Costs one extra coordinate pair and stays invisible until a marker is dragged. |
 | Build from text source | An `.xlsm` is opaque to review and diffing; a build script keeps the real source readable and lets the work be tested automatically. |
 
 ## Out of scope
