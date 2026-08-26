@@ -50,3 +50,25 @@ def wb(app, artifact):
         yield book
     finally:
         book.Close(SaveChanges=False)
+
+
+LIBRARY_ARTIFACT = ROOT / "dist" / "ConnectorLibrary.xlsx"
+
+
+@pytest.fixture(scope="session")
+def library_artifact(artifact) -> Path:
+    """Depends on `artifact` so the one `build.py` subprocess run - which
+    now builds both files - has already happened."""
+    assert LIBRARY_ARTIFACT.exists(), f"build produced no artifact at {LIBRARY_ARTIFACT}"
+    return LIBRARY_ARTIFACT
+
+
+@pytest.fixture
+def library_wb(app, library_artifact):
+    """A freshly opened copy of the built library workbook, discarded after
+    each test."""
+    book = app.Workbooks.Open(str(library_artifact))
+    try:
+        yield book
+    finally:
+        book.Close(SaveChanges=False)

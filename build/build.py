@@ -9,11 +9,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import excel_com
 import layout
+import library_layout
 
 ROOT = Path(__file__).resolve().parents[1]
 VBA_DIR = ROOT / "src" / "vba"
 DIST = ROOT / "dist"
 CREATOR_NAME = "HarnessCreator.xlsm"
+LIBRARY_NAME = "ConnectorLibrary.xlsx"
 
 VBA_MODULES = ["modUtil.bas", "modState.bas", "modConnectors.bas", "modChart.bas"]
 BUILD_VERSION = "0.1.0"
@@ -53,6 +55,18 @@ def build(out_dir: Path = DIST) -> Path:
     return target
 
 
+def build_library(out_dir: Path = DIST) -> Path:
+    target = out_dir / LIBRARY_NAME
+    with excel_com.excel_app() as app:
+        wb = app.Workbooks.Add()
+        try:
+            library_layout.build_library_sheets(wb)
+            excel_com.save_as_xlsx(wb, target)
+        finally:
+            wb.Close(SaveChanges=False)
+    return target
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build the Harness Creator workbook.")
     parser.add_argument(
@@ -70,6 +84,7 @@ def main() -> int:
         return 1
 
     print(f"Built {build()}")
+    print(f"Built {build_library()}")
     return 0
 
 

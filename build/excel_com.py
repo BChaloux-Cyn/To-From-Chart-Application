@@ -70,3 +70,17 @@ def save_as_xlsm(wb, path: Path) -> None:
     if path.exists():
         path.unlink()
     wb.SaveAs(Filename=str(path), FileFormat=XL_OPENXML_MACRO_ENABLED)
+
+
+XL_OPENXML_WORKBOOK = 51
+
+
+def save_as_xlsx(wb, path: Path) -> None:
+    """Save as a plain, macro-free .xlsx. No VBA project may be imported
+    into wb before calling this - Excel silently strips it either way, but
+    importing it first would raise a "file may contain features not
+    compatible" alert this build runs headless and cannot dismiss."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        path.unlink()
+    wb.SaveAs(Filename=str(path), FileFormat=XL_OPENXML_WORKBOOK)
