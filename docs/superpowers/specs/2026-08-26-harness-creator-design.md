@@ -358,6 +358,18 @@ Reported as information, not errors:
 Output is a table on `Check`: row number, severity, message. The same
 validation runs automatically after Load.
 
+### Validation is advisory
+
+Check Drawing never blocks anything. Saving a harness, exporting a PDF, and
+writing an archive copy all succeed with errors outstanding. "Error" means
+the tool believes something is wrong and is worth a second look, not that the
+student is forbidden from producing their drawing.
+
+This is deliberate. A student may be documenting a harness that is unusual,
+half-finished, or correct in a way the tool does not model, and the tool
+being wrong must never stop them from turning in work. Anything the tool
+cannot be certain about is reported as information rather than as an error.
+
 ## Build system
 
 The `.xlsm` is a build artifact, never hand-edited. All source is text.
@@ -405,6 +417,8 @@ pytest drives Excel COM against the built artifact.
   leader line is drawn for a pin whose marker was offset from its anchor, and
   that no leader exists for a pin whose marker sits on its anchor.
 - **Validation**: seed each error class and assert it appears on `Check`.
+  Assert that Save, Export PDF, and Save Archive Copy all still succeed while
+  errors are outstanding.
 - **Export**: export a PDF and assert the file exists and is non-trivial.
 
 To keep logic testable, no logic module raises UI. `MsgBox` and dialogs are
@@ -446,8 +460,10 @@ have caught it.
 - Auto-drawn harness diagram (phase 5, deferred)
 - Duplicate-endpoint checking. Two wires landing on the same connector pin is
   not reported. The rule is only correct for `Connector` endpoints - studs
-  and splices are multi-drop by nature - and the type-aware version is not
-  worth building until the simpler checks have been used in a classroom.
+  and splices are multi-drop by nature - and even for a connector a double
+  crimp is sometimes the intended design. If this is revisited it ships as
+  information, never as an error, because the tool cannot tell a mistake from
+  a deliberate choice here.
 - Wire bundle or branch modeling, and overall harness length calculations
 - Bill of materials generation
 - Any non-Windows or Excel-for-web support
