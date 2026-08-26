@@ -1,0 +1,16 @@
+# Build artifacts
+dist/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# Excel lock and recovery files
+~$*
+*.tmp
+
+# Local photo cache
+Photos/
