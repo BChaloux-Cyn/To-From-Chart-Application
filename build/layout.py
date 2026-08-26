@@ -93,3 +93,79 @@ def build_lists(sheets) -> None:
 def build_names(wb) -> None:
     for name, refers_to in LIST_NAMES.items():
         wb.Names.Add(Name=name, RefersTo=refers_to)
+
+
+CHART_HEADER_ROW = 6
+CHART_FIRST_ROW = 7
+CHART_LAST_ROW = 1006
+
+CHART_HEADERS = [
+    "From Conn", "From Pin", "From Term", "Signal", "Color", "AWG",
+    "Length (in)", "To Term", "To Conn", "To Pin", "Notes",
+]
+
+CHART_COLUMN_WIDTHS = [11, 9, 15, 18, 13, 7, 12, 15, 11, 9, 30]
+
+# (label text, label cell, value cell)
+TITLE_BLOCK = [
+    ("Harness Name", "A2", "B2"),
+    ("Harness Number", "D2", "E2"),
+    ("Revision", "G2", "H2"),
+    ("Student", "A3", "B3"),
+    ("Class / Project", "D3", "E3"),
+    ("Date", "G3", "H3"),
+    ("Description", "A4", "B4"),
+    ("Length Units", "G4", "H4"),
+]
+
+TB_NAMES = {
+    "TB_Name": "B2",
+    "TB_Number": "E2",
+    "TB_Rev": "H2",
+    "TB_Student": "B3",
+    "TB_Class": "E3",
+    "TB_Date": "H3",
+    "TB_Desc": "B4",
+    "TB_Units": "H4",
+}
+
+XL_VALIDATE_LIST = 3
+XL_VALID_ALERT_STOP = 1
+XL_BETWEEN = 1
+
+
+def build_harness(sheets) -> None:
+    sheet = sheets["Harness"]
+
+    sheet.Range("A1").Value = "WIRE HARNESS TO-FROM CHART"
+    sheet.Range("A1").Font.Size = 16
+    sheet.Range("A1").Font.Bold = True
+
+    for label, label_cell, value_cell in TITLE_BLOCK:
+        sheet.Range(label_cell).Value = label
+        sheet.Range(label_cell).Font.Bold = True
+        sheet.Range(value_cell).Interior.Color = 0xF2F2F2
+
+    sheet.Range(TB_NAMES["TB_Units"]).Value = "in"
+    units = sheet.Range(TB_NAMES["TB_Units"]).Validation
+    units.Delete()
+    units.Add(
+        Type=XL_VALIDATE_LIST,
+        AlertStyle=XL_VALID_ALERT_STOP,
+        Operator=XL_BETWEEN,
+        Formula1="in,mm",
+    )
+    units.IgnoreBlank = True
+    units.InCellDropdown = True
+
+    for index, header in enumerate(CHART_HEADERS, start=1):
+        cell = sheet.Cells(CHART_HEADER_ROW, index)
+        cell.Value = header
+        cell.Font.Bold = True
+        cell.Interior.Color = 0xD9D9D9
+        sheet.Columns(index).ColumnWidth = CHART_COLUMN_WIDTHS[index - 1]
+
+
+def build_title_block_names(wb, sheets) -> None:
+    for name, cell in TB_NAMES.items():
+        wb.Names.Add(Name=name, RefersTo=f"='Harness'!${cell[0]}${cell[1:]}")

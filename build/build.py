@@ -29,6 +29,8 @@ def build(out_dir: Path = DIST) -> Path:
             sheets = layout.build_sheets(wb, excel_com.set_codename)
             layout.build_lists(sheets)
             layout.build_names(wb)
+            layout.build_harness(sheets)
+            layout.build_title_block_names(wb, sheets)
             for name in VBA_MODULES:
                 excel_com.import_module(wb, VBA_DIR / name)
             excel_com.save_as_xlsm(wb, target)
