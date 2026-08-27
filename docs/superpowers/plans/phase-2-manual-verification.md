@@ -292,18 +292,33 @@ If Task 1's automated test fails in a way that looks clipboard-related:
   machine) - see the dragging item above. Regression tests added for all
   fixed bugs (structural, matching this codebase's precedent for
   mouse/clipboard-driven form code with no automated behavioral coverage).
-- 2c: _not yet run_ (implemented; includes edit-mode support beyond the
-  original sub-plan - see the "Extra attention" list above). **Elevated
-  risk found during 2b:** `LoadForEdit`'s photo preview and `modSnapshot.bas`'s
-  chart-photo caching both depend on `modLibrary.ExportShapeToFile`
-  (`Shape.Copy`/`Chart.Paste`), which 2b found to be broken on this machine
-  for VBA-triggered clipboard operations - confirmed via both headless
-  automation and a real interactive session. Watch specifically for blank/
-  missing photos when running the items below.
+- 2c: **in progress, paused here - resume with the items below.**
+  Confirmed working: Manage Library > Edit (3 bugs found and fixed - form
+  sizing, an `Unload Me` ordering bug that discarded `LoadForEdit`'s
+  populated fields, and the Type dropdown's `ActiveWorkbook`-dependent
+  RowSource), and Add Connector's core add-and-snapshot flow for a
+  connector whose photo cache already exists (the `.png`-vs-`.jpg` cache
+  mismatch that made `_Snapshot` photos always blank is fixed).
+  **Next to pick up:**
+  - An unresolved bug where creating a connector via Add Connector's
+    "New..." button can leave `mPhotoPath`/`mConnectorID` blank at Save
+    time despite Load Photo visibly working during the session - see the
+    "Add Connector" item above for what's confirmed so far and the
+    planned testability refactor to chase it headlessly instead of via
+    more manual VBE-debugger round trips.
+  - The "auto-add an instance after New..." feature is implemented but
+    unconfirmed, blocked on the bug above.
+  - Not yet started: Manage Library > Delete, Remove Connector, ref des
+    rename-rewrite, Cancel-after-Edit, and the `shConnectors.evt` real
+    mouse-driven cell-edit double-check (all still `[ ]` above).
+  - `modSnapshot.bas`'s photo-cache-miss fallback still depends on the
+    confirmed-unreliable `ExportShapeToFile`/`Chart.Paste` mechanism -
+    elevated risk for any connector that never gets a `.jpg` cache
+    written (e.g. one saved through the still-buggy "New..." path).
 - 2d: Task 1 clipboard check run (see above, non-blocking flake noted); the
   "Final task" click-through (export/import/fallback-prompt round trip) is
   _not yet run_ - do it as part of this consolidated batch, before 2e.
-- Adjustments made as a result: see per-item notes above (2b) for the full
-  list; test suite not yet re-run since the last set of fixes (Excel was
-  open) - run `pytest` before considering 2b's fixes verified by the
+- Adjustments made as a result: see per-item notes above (2b, 2c) for the
+  full list. Test suite not yet re-run since this session's fixes - run
+  `pytest` (Excel closed) before considering any of this verified by the
   automated suite too, not just manually.
