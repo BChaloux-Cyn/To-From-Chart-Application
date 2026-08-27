@@ -70,3 +70,52 @@ def build_connector_editor_form(wb, add_userform) -> None:
 
     combo = designer.Controls("cboType")
     combo.RowSource = "_Lists!{0}2:{0}{1}".format(TYPE_LIST_COLUMN_LETTER, len(TYPE_CHOICES) + 1)
+
+
+PICKER_NAME = "frmConnectorPicker"
+PICKER_CONTROLS = [
+    ("Forms.ListBox.1", "lstConnectors", 12, 12, 300, 200, {}),
+    ("Forms.CommandButton.1", "cmdAdd", 12, 220, 90, 24, {"Caption": "Add"}),
+    ("Forms.CommandButton.1", "cmdNew", 110, 220, 90, 24, {"Caption": "New..."}),
+    ("Forms.CommandButton.1", "cmdCancel", 222, 220, 90, 24, {"Caption": "Cancel"}),
+]
+
+MANAGE_LIBRARY_NAME = "frmManageLibrary"
+MANAGE_LIBRARY_CONTROLS = [
+    ("Forms.ListBox.1", "lstConnectors", 12, 12, 300, 200, {}),
+    ("Forms.CommandButton.1", "cmdEdit", 12, 220, 80, 24, {"Caption": "Edit"}),
+    ("Forms.CommandButton.1", "cmdDelete", 96, 220, 80, 24, {"Caption": "Delete"}),
+    ("Forms.CommandButton.1", "cmdImport", 180, 220, 80, 24, {"Caption": "Import..."}),
+    ("Forms.CommandButton.1", "cmdExport", 264, 220, 80, 24, {"Caption": "Export..."}),
+    ("Forms.CommandButton.1", "cmdClose", 348, 220, 80, 24, {"Caption": "Close"}),
+]
+
+
+def _build_form(wb, add_userform, name, caption, width, height, control_specs):
+    designer = add_userform(wb, name)
+    designer.Caption = caption
+    # Designer.Width/Height aren't settable through win32com's dynamic
+    # dispatch (unlike Caption); the VBComponent's Properties collection
+    # reaches the same underlying value, same technique
+    # build_connector_editor_form and excel_com.set_codename use.
+    component = wb.VBProject.VBComponents(name)
+    component.Properties("Width").Value = width
+    component.Properties("Height").Value = height
+
+    for progid, ctl_name, left, top, ctl_width, ctl_height, extra in control_specs:
+        control = designer.Controls.Add(progid)
+        control.Name = ctl_name
+        control.Left = left
+        control.Top = top
+        control.Width = ctl_width
+        control.Height = ctl_height
+        for prop, value in extra.items():
+            setattr(control, prop, value)
+
+
+def build_connector_picker_form(wb, add_userform) -> None:
+    _build_form(wb, add_userform, PICKER_NAME, "Add Connector", 340, 260, PICKER_CONTROLS)
+
+
+def build_manage_library_form(wb, add_userform) -> None:
+    _build_form(wb, add_userform, MANAGE_LIBRARY_NAME, "Manage Library", 340, 260, MANAGE_LIBRARY_CONTROLS)

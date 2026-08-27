@@ -1,0 +1,69 @@
+Option Explicit
+
+Private mLibrary As Workbook
+Private mConnectorIDs() As String
+
+Private Sub UserForm_Initialize()
+    Set mLibrary = Workbooks.Open(ThisWorkbook.Path & "\ConnectorLibrary.xlsx")
+    RefreshList
+End Sub
+
+Private Sub RefreshList()
+    Dim ws As Worksheet, nLast As Long, r As Long, n As Long
+
+    lstConnectors.Clear
+    Set ws = mLibrary.Worksheets("Connectors")
+    nLast = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    If nLast < 2 Then Exit Sub
+
+    ReDim mConnectorIDs(1 To nLast - 1)
+    For r = 2 To nLast
+        n = n + 1
+        mConnectorIDs(n) = Trim$(CStr(ws.Cells(r, modLibrary.LIB_COL_ID).Value))
+        lstConnectors.AddItem mConnectorIDs(n) & " - " & CStr(ws.Cells(r, modLibrary.LIB_COL_NAME).Value)
+    Next r
+End Sub
+
+Private Sub cmdEdit_Click()
+    If lstConnectors.ListIndex < 0 Then Exit Sub
+    Dim sConnectorID As String
+    sConnectorID = mConnectorIDs(lstConnectors.ListIndex + 1)
+
+    Dim vFields As Variant
+    vFields = modLibrary.ReadConnector(mLibrary.Worksheets("Connectors"), 2, modLibrary.LIB_ROW_CAP, sConnectorID)
+    If IsEmpty(vFields) Then Exit Sub
+
+    modPinEditor.LoadScratchPins ThisWorkbook.Worksheets("_Edit"), mLibrary.Worksheets("Pins"), sConnectorID
+
+    ' Load (not Show) instantiates frmConnectorEditor and runs its
+    ' UserForm_Initialize, so LoadForEdit can populate it - all while
+    ' mLibrary is still open, since LoadForEdit reads the connector's photo
+    ' shape straight off mLibrary's Photos sheet.
+    Load frmConnectorEditor
+    frmConnectorEditor.LoadForEdit sConnectorID, vFields, mLibrary.Worksheets("Photos")
+
+    mLibrary.Close SaveChanges:=False
+    Unload Me
+    frmConnectorEditor.Show
+End Sub
+
+Private Sub cmdDelete_Click()
+    If lstConnectors.ListIndex < 0 Then Exit Sub
+    Dim sConnectorID As String
+    sConnectorID = mConnectorIDs(lstConnectors.ListIndex + 1)
+
+    If MsgBox("Delete " & sConnectorID & " from the library? This cannot be undone.", _
+              vbYesNo + vbQuestion) <> vbYes Then Exit Sub
+
+    modLibrary.DeleteConnector mLibrary.Worksheets("Connectors"), 2, modLibrary.LIB_ROW_CAP, sConnectorID
+    modLibrary.DeletePinsForConnector mLibrary.Worksheets("Pins"), 2, modLibrary.LIB_ROW_CAP, sConnectorID
+    modLibrary.RemoveConnectorPhoto mLibrary.Worksheets("Photos"), sConnectorID
+    mLibrary.Save
+
+    RefreshList
+End Sub
+
+Private Sub cmdClose_Click()
+    mLibrary.Close SaveChanges:=False
+    Unload Me
+End Sub

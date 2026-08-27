@@ -1,0 +1,59 @@
+Option Explicit
+
+Private mLibrary As Workbook
+Private mConnectorIDs() As String
+
+Private Sub UserForm_Initialize()
+    Set mLibrary = Workbooks.Open(ThisWorkbook.Path & "\ConnectorLibrary.xlsx")
+    RefreshList
+End Sub
+
+Private Sub RefreshList()
+    Dim ws As Worksheet, nLast As Long, r As Long, n As Long
+
+    lstConnectors.Clear
+    Set ws = mLibrary.Worksheets("Connectors")
+    nLast = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    If nLast < 2 Then Exit Sub
+
+    ReDim mConnectorIDs(1 To nLast - 1)
+    For r = 2 To nLast
+        n = n + 1
+        mConnectorIDs(n) = Trim$(CStr(ws.Cells(r, modLibrary.LIB_COL_ID).Value))
+        lstConnectors.AddItem mConnectorIDs(n) & " - " & CStr(ws.Cells(r, modLibrary.LIB_COL_NAME).Value)
+    Next r
+End Sub
+
+Private Sub cmdAdd_Click()
+    If lstConnectors.ListIndex < 0 Then Exit Sub
+    Dim sConnectorID As String
+    sConnectorID = mConnectorIDs(lstConnectors.ListIndex + 1)
+
+    ' modLibrary.ReadConnector returns a 1-based Dim vResult(1 To 11) array
+    ' when called in-process like this (never crossing Application.Run) -
+    ' vFields(1) is ConnectorID, not vFields(0).
+    Dim vFields As Variant
+    vFields = modLibrary.ReadConnector(mLibrary.Worksheets("Connectors"), 2, modLibrary.LIB_ROW_CAP, sConnectorID)
+    If IsEmpty(vFields) Then Exit Sub
+
+    Dim sRefDes As String
+    sRefDes = modConnectors.AddConnectorInstance(vFields(1), vFields(2), vFields(4), vFields(5), CLng(vFields(6)))
+    If Len(sRefDes) = 0 Then Exit Sub
+
+    modSnapshot.SnapshotConnector ThisWorkbook.Worksheets("_Snapshot"), mLibrary.Worksheets("Connectors"), _
+        mLibrary.Worksheets("Pins"), mLibrary.Worksheets("Photos"), sConnectorID
+
+    mLibrary.Close SaveChanges:=False
+    Unload Me
+End Sub
+
+Private Sub cmdNew_Click()
+    mLibrary.Close SaveChanges:=False
+    Unload Me
+    frmConnectorEditor.Show
+End Sub
+
+Private Sub cmdCancel_Click()
+    mLibrary.Close SaveChanges:=False
+    Unload Me
+End Sub

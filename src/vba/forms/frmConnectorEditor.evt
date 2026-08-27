@@ -13,6 +13,91 @@ Private Sub UserForm_Initialize()
     cboType.ListIndex = 0
 End Sub
 
+' Called (after Load, before Show) by frmManageLibrary's cmdEdit_Click,
+' which has already seeded _Edit's scratch pins via modPinEditor.
+' LoadScratchPins - this only has to populate the visible fields and
+' rebuild the on-screen pin markers from that scratch data. vFields is the
+' 1-based Dim vResult(1 To 11) array modLibrary.ReadConnector returns.
+Public Sub LoadForEdit(ByVal sConnectorID As String, ByVal vFields As Variant, wsLibPhotos As Worksheet)
+    mConnectorID = sConnectorID
+
+    txtName.Text = CStr(vFields(2))
+    txtManufacturer.Text = CStr(vFields(3))
+    txtPartNumber.Text = CStr(vFields(4))
+    cboType.Text = CStr(vFields(5))
+    txtPinCount.Text = CStr(vFields(6))
+    txtNotes.Text = CStr(vFields(7))
+
+    LoadExistingPhoto wsLibPhotos, sConnectorID
+    RebuildPinListFromScratch
+End Sub
+
+Private Sub LoadExistingPhoto(wsLibPhotos As Worksheet, ByVal sConnectorID As String)
+    Dim shp As Shape
+    On Error Resume Next
+    Set shp = wsLibPhotos.Shapes("PHOTO_" & sConnectorID)
+    On Error GoTo 0
+    If shp Is Nothing Then Exit Sub
+
+    ' EmbedConnectorPhoto (and so modPinEditor.SaveConnector) always needs a
+    ' real file on disk, but a shape already embedded in the library has no
+    ' such file - export it to one in TEMP so cmdSave_Click can re-embed it
+    ' unchanged if the student edits fields without picking a new photo.
+    Dim sTempPath As String
+    sTempPath = Environ$("TEMP") & "\" & sConnectorID & "_edit.png"
+    If Not ExportShapeToFile(shp, sTempPath) Then Exit Sub
+
+    Dim pic As IPictureDisp
+    Set pic = LoadPicture(sTempPath)
+    If pic Is Nothing Then Exit Sub
+
+    Dim vFit As Variant
+    vFit = modPinEditor.FitAspectRatio(CDbl(pic.Width), CDbl(pic.Height), imgPhoto.Width, imgPhoto.Height)
+    If IsEmpty(vFit) Then Exit Sub
+
+    imgPhoto.PictureSizeMode = fmPictureSizeModeStretch
+    imgPhoto.Picture = pic
+    imgPhoto.Width = vFit(0)
+    imgPhoto.Height = vFit(1)
+
+    mPhotoPath = sTempPath
+End Sub
+
+Private Function ExportShapeToFile(shp As Shape, ByVal sPath As String) As Boolean
+    ' Excel has no direct "export a Shape to an image file" call - pasting
+    ' it into a throwaway ChartObject and exporting the chart is the
+    ' standard workaround.
+    Dim wsTemp As Worksheet, cht As ChartObject
+
+    Set wsTemp = ThisWorkbook.Worksheets("_Edit")
+    shp.Copy
+    Set cht = wsTemp.ChartObjects.Add(0, 0, shp.Width, shp.Height)
+    cht.Chart.Paste
+    cht.Chart.Export sPath, "PNG"
+    cht.Delete
+
+    ExportShapeToFile = (Len(Dir$(sPath)) > 0)
+End Function
+
+Private Sub RebuildPinListFromScratch()
+    Dim vPins As Variant, i As Long, nPinNumber As Long
+    Dim dLabelX As Double, dLabelY As Double
+
+    vPins = modLibrary.ReadPinsForConnector(ThisWorkbook.Worksheets("_Edit"), _
+        modPinEditor.SCRATCH_FIRST_ROW, modPinEditor.SCRATCH_LAST_ROW, mConnectorID)
+    If IsEmpty(vPins) Then Exit Sub
+
+    For i = LBound(vPins, 1) To UBound(vPins, 1)
+        nPinNumber = CLng(vPins(i, 2))
+        lstPins.AddItem "Pin " & CStr(nPinNumber)
+        mListPinNumbers.Add nPinNumber
+        dLabelX = CDbl(vPins(i, 6))
+        dLabelY = CDbl(vPins(i, 7))
+        AddMarkerControl nPinNumber, dLabelX * imgPhoto.Width, dLabelY * imgPhoto.Height
+        If nPinNumber >= mNextPinNumber Then mNextPinNumber = nPinNumber + 1
+    Next i
+End Sub
+
 Private Sub cmdLoadPhoto_Click()
     Dim sPath As String
     sPath = Application.GetOpenFilename( _
