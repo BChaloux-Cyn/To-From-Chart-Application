@@ -67,3 +67,35 @@ Public Function ImportConnector(wsSrcConn As Worksheet, wsSrcPins As Worksheet, 
 
     ImportConnector = sDestID
 End Function
+
+Public Sub BuildExportSheets(wb As Workbook)
+    Dim names As Variant, i As Long, sheet As Worksheet, original As Worksheet
+    names = Array("Connectors", "Pins", "Photos")
+
+    Set original = wb.Worksheets(1)
+    For i = LBound(names) To UBound(names)
+        Set sheet = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
+        sheet.Name = CStr(names(i))
+    Next i
+
+    ' Worksheet.Delete always shows a "permanently remove" confirmation
+    ' unless DisplayAlerts is off - original is the new workbook's own
+    ' empty default sheet, nothing the user asked to keep.
+    Dim bPriorAlerts As Boolean
+    bPriorAlerts = Application.DisplayAlerts
+    Application.DisplayAlerts = False
+    original.Delete
+    Application.DisplayAlerts = bPriorAlerts
+
+    Dim connHeaders As Variant, pinHeaders As Variant, c As Long
+    connHeaders = Array("ConnectorID", "Name", "Manufacturer", "PartNumber", "Type", _
+                         "PinCount", "Notes", "PhotoShapeName", "CreatedUtc", "ModifiedUtc", "Origin")
+    pinHeaders = Array("ConnectorID", "PinNumber", "PinLabel", "NormX", "NormY", "LabelX", "LabelY")
+
+    For c = LBound(connHeaders) To UBound(connHeaders)
+        wb.Worksheets("Connectors").Cells(1, c + 1).Value = connHeaders(c)
+    Next c
+    For c = LBound(pinHeaders) To UBound(pinHeaders)
+        wb.Worksheets("Pins").Cells(1, c + 1).Value = pinHeaders(c)
+    Next c
+End Sub

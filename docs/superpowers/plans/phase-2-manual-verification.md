@@ -94,7 +94,8 @@ precedent):**
 
 ## 2d: Library import/export
 
-Status: not yet implemented.
+Status: implemented (2026-08-27), commits `78e03d2`..(Task 3). **Wiring
+click-through outstanding - not yet run.**
 
 Two separate manual checks, per the sub-plan:
 
@@ -103,13 +104,22 @@ Two separate manual checks, per the sub-plan:
 codebase, and headless COM automation has not been proven reliable for it.
 If Task 1's automated test fails in a way that looks clipboard-related:
 
-- [ ] Verify by hand: run the same `Shape.Copy`/`Paste` two lines
+- [x] Verify by hand: run the same `Shape.Copy`/`Paste` two lines
       interactively in the VBE Immediate window against a **visible** Excel
       instance. Record whether it works there.
-- [ ] If it fails even visibly, that's a real environment limitation the spec
+      **Result: works reliably in isolation** (both visible and headless,
+      both direct COM and via `Application.Run`, run repeatedly with no
+      failures). Under the full pytest suite it is intermittently flaky
+      (~1 failure in 11 runs observed across two sessions) - looks like a
+      clipboard race rather than a hard environment limitation, but not
+      worth chasing further per the plan's own guidance below.
+- [x] If it fails even visibly, that's a real environment limitation the spec
       already anticipated - note it plainly (here, and in 2e's design doc)
       and let the extraction-failure fallback prompt (Task 3) carry the
       feature rather than forcing a workaround.
+      **Not applicable** - it does not fail visibly; the flake is
+      pytest-session-specific. If a CI run hits it, re-running the test file
+      alone is expected to pass.
 
 **Final task (Manage Library import/export wiring):**
 
@@ -126,5 +136,7 @@ If Task 1's automated test fails in a way that looks clipboard-related:
 - 2b: _not yet run_
 - 2c: _not yet run_ (implemented; includes edit-mode support beyond the
   original sub-plan - see the "Extra attention" list above)
-- 2d: _not yet run_
+- 2d: Task 1 clipboard check run (see above, non-blocking flake noted); the
+  "Final task" click-through (export/import/fallback-prompt round trip) is
+  _not yet run_ - do it as part of this consolidated batch, before 2e.
 - Adjustments made as a result: _none yet_

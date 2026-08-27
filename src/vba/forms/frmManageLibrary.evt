@@ -61,6 +61,89 @@ Private Sub cmdDelete_Click()
     RefreshList
 End Sub
 
+Private Sub cmdExport_Click()
+    If lstConnectors.ListIndex < 0 Then Exit Sub
+    Dim sConnectorID As String
+    sConnectorID = mConnectorIDs(lstConnectors.ListIndex + 1)
+
+    Dim sPath As Variant
+    sPath = Application.GetSaveAsFilename( _
+        InitialFileName:=sConnectorID & "_export.xlsx", _
+        FileFilter:="Excel Workbook (*.xlsx), *.xlsx")
+    If sPath = False Then Exit Sub
+
+    Dim destWb As Workbook
+    Set destWb = Workbooks.Add
+    modLibraryTransfer.BuildExportSheets destWb
+
+    Dim ok As Boolean
+    ok = modLibraryTransfer.ExportConnector(mLibrary.Worksheets("Connectors"), mLibrary.Worksheets("Pins"), _
+        mLibrary.Worksheets("Photos"), destWb.Worksheets("Connectors"), destWb.Worksheets("Pins"), _
+        destWb.Worksheets("Photos"), sConnectorID)
+
+    If ok Then
+        destWb.SaveAs Filename:=CStr(sPath), FileFormat:=51
+        MsgBox "Exported " & sConnectorID & ".", vbInformation
+    Else
+        MsgBox "Could not export " & sConnectorID & ".", vbExclamation
+    End If
+    destWb.Close SaveChanges:=False
+End Sub
+
+Private Sub cmdImport_Click()
+    Dim sPath As Variant
+    sPath = Application.GetOpenFilename(FileFilter:="Excel Workbook (*.xlsx), *.xlsx")
+    If sPath = False Then Exit Sub
+
+    Dim srcWb As Workbook
+    Set srcWb = Workbooks.Open(CStr(sPath))
+
+    Dim sOriginName As String
+    sOriginName = srcWb.Name
+
+    Dim nLast As Long, r As Long, sConnectorID As String, sDestID As String
+    Dim wsSrcConn As Worksheet
+    Set wsSrcConn = srcWb.Worksheets("Connectors")
+    nLast = wsSrcConn.Cells(wsSrcConn.Rows.Count, 1).End(xlUp).Row
+
+    For r = 2 To nLast
+        sConnectorID = Trim$(CStr(wsSrcConn.Cells(r, modLibrary.LIB_COL_ID).Value))
+        If Len(sConnectorID) > 0 Then
+            sDestID = modLibraryTransfer.ImportConnector(wsSrcConn, srcWb.Worksheets("Pins"), _
+                srcWb.Worksheets("Photos"), mLibrary.Worksheets("Connectors"), mLibrary.Worksheets("Pins"), _
+                mLibrary.Worksheets("Photos"), sConnectorID, sOriginName)
+
+            If Len(sDestID) > 0 Then
+                ' ImportConnector already attempted the photo copy internally -
+                ' calling CopyConnectorPhoto again here would redo a clipboard
+                ' operation that may not even be deterministic, and could give
+                ' a different answer than the one that actually happened. Check
+                ' whether the shape it should have produced exists instead.
+                Dim bPhotoExists As Boolean
+                bPhotoExists = False
+                On Error Resume Next
+                bPhotoExists = Not (mLibrary.Worksheets("Photos").Shapes("PHOTO_" & sDestID) Is Nothing)
+                On Error GoTo 0
+
+                If Not bPhotoExists Then
+                    Dim sReplacement As Variant
+                    sReplacement = Application.GetOpenFilename( _
+                        "Pictures (*.png; *.jpg; *.jpeg; *.bmp), *.png;*.jpg;*.jpeg;*.bmp", _
+                        , "Photo for " & sDestID & " could not be extracted - choose a replacement")
+                    If sReplacement <> False Then
+                        modLibrary.EmbedConnectorPhoto mLibrary.Worksheets("Photos"), sDestID, CStr(sReplacement)
+                    End If
+                End If
+            End If
+        End If
+    Next r
+
+    srcWb.Close SaveChanges:=False
+    mLibrary.Save
+    RefreshList
+    MsgBox "Import complete.", vbInformation
+End Sub
+
 Private Sub cmdClose_Click()
     Unload Me
 End Sub

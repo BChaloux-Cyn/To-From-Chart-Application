@@ -56,12 +56,6 @@ def test_manage_library_delete_calls_library_delete_functions(wb):
     assert "modLibrary.DeletePinsForConnector" in source
 
 
-def test_manage_library_import_export_are_unwired_for_now(wb):
-    source = module_source(wb, "frmManageLibrary")
-    assert "cmdImport_Click" not in source
-    assert "cmdExport_Click" not in source
-
-
 def test_home_has_the_three_new_buttons(wb):
     shapes = wb.Worksheets("Home").Shapes
     actions = [shapes(i + 1).OnAction for i in range(shapes.Count)]
