@@ -1430,6 +1430,8 @@ Expected: all passed (197 after Task 7 + 11 = 208).
 
 Open `dist/HarnessCreator.xlsm`, run `frmConnectorEditor` from the VBE's Immediate window (`frmConnectorEditor.Show`) or a temporary button, and confirm by hand: Load Photo fits the image without letterboxing; Place Pins drops numbered markers on click; dragging a marker moves only the marker and shows a leader once pulled away; clicking the image after selecting a pin in the list moves its anchor; Snap Label to Pin removes the leader; Save writes to `ConnectorLibrary.xlsx` and closes the form; Cancel discards the scratch pins. This has no automated substitute - record the result in the commit message or a follow-up note, not as a test.
 
+Tracked in the consolidated `docs/superpowers/plans/phase-2-manual-verification.md` - run as part of that batch after 2d, before 2e, not necessarily right now.
+
 - [ ] **Step 9: Commit**
 
 ```bash

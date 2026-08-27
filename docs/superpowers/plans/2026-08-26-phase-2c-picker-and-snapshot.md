@@ -1024,6 +1024,8 @@ Expected: all passed (220 after Task 3 + 4 from Task 4 + 15 from Task 5 = 239).
 
 Open `dist/HarnessCreator.xlsm`. Add Connector should list the library, add an instance, and populate `_Snapshot`. Manage Library's Edit should reopen the editor pre-loaded with existing pins; Delete should prompt and then remove the entry. Remove Connector should prompt for a ref des and clear its chart references. Record the result in the commit message, not as a test - matching 2b Task 8's precedent.
 
+Tracked in the consolidated `docs/superpowers/plans/phase-2-manual-verification.md` - run as part of that batch after 2d, before 2e, not necessarily right now.
+
 - [ ] **Step 10: Commit**
 
 ```bash

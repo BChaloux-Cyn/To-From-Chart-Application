@@ -588,6 +588,8 @@ Expected: all passed (245 from Task 2 + 3 = 248).
 
 Open `dist/HarnessCreator.xlsm`, `Manage Library`. Export a connector to a new file and confirm the saved file opens with the correct schema and data. Import that same file back in and confirm it round-trips (or, since it is now present, renames to `-2` and the original is untouched). If a test connector's photo shape is deliberately removed before import to force the extraction-failure path, confirm the replacement-image prompt appears and the substituted photo lands correctly. Record the result in the commit message - matching 2b Task 8 and 2c Task 5's precedent.
 
+Tracked in the consolidated `docs/superpowers/plans/phase-2-manual-verification.md`, along with Task 1's separate clipboard-reliability check above - run both as part of that batch after this sub-plan finishes, before 2e.
+
 - [ ] **Step 7: Commit**
 
 ```bash
