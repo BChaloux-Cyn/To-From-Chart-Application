@@ -4,6 +4,13 @@ Option Explicit
 Public Const SCRATCH_FIRST_ROW As Long = 2
 Public Const SCRATCH_LAST_ROW As Long = 2000
 
+' A normalized-distance tolerance for the editor's own live preview only -
+' see MarkerSitsOnAnchor. Declared here, with the other module-level
+' consts, not next to its first use: VBA requires every module-level Const
+' to sit in the general-declarations section before the first Sub/Function,
+' not merely before whichever procedure first references it.
+Public Const PREVIEW_LEADER_THRESHOLD As Double = 0.01
+
 Public Sub ClearScratchPins(wsScratch As Worksheet)
     wsScratch.Range(wsScratch.Cells(SCRATCH_FIRST_ROW, 1), _
                     wsScratch.Cells(SCRATCH_LAST_ROW, modLibrary.PIN_FIELD_COUNT)).ClearContents
@@ -71,4 +78,71 @@ Public Function RemovePin(wsScratch As Worksheet, ByVal sConnectorID As String, 
     wsScratch.Range(wsScratch.Cells(nLast, 1), wsScratch.Cells(nLast, modLibrary.PIN_FIELD_COUNT)).ClearContents
 
     RemovePin = True
+End Function
+
+Public Function MarkerSitsOnAnchor(ByVal dAnchorX As Double, ByVal dAnchorY As Double, _
+                                   ByVal dLabelX As Double, ByVal dLabelY As Double) As Boolean
+    Dim dDx As Double, dDy As Double
+    dDx = dLabelX - dAnchorX
+    dDy = dLabelY - dAnchorY
+    MarkerSitsOnAnchor = (Sqr(dDx * dDx + dDy * dDy) <= PREVIEW_LEADER_THRESHOLD)
+End Function
+
+Public Function MoveAnchor(wsScratch As Worksheet, ByVal sConnectorID As String, _
+                           ByVal nPinNumber As Long, ByVal dNormX As Double, ByVal dNormY As Double) As Boolean
+    Dim r As Long, dOldAnchorX As Double, dOldAnchorY As Double, dLabelX As Double, dLabelY As Double
+
+    r = FindPinRow(wsScratch, sConnectorID, nPinNumber)
+    If r = 0 Then Exit Function
+
+    dOldAnchorX = CDbl(wsScratch.Cells(r, modLibrary.PIN_COL_NORMX).Value)
+    dOldAnchorY = CDbl(wsScratch.Cells(r, modLibrary.PIN_COL_NORMY).Value)
+    dLabelX = CDbl(wsScratch.Cells(r, modLibrary.PIN_COL_LABELX).Value)
+    dLabelY = CDbl(wsScratch.Cells(r, modLibrary.PIN_COL_LABELY).Value)
+
+    If MarkerSitsOnAnchor(dOldAnchorX, dOldAnchorY, dLabelX, dLabelY) Then
+        wsScratch.Cells(r, modLibrary.PIN_COL_LABELX).Value = dNormX
+        wsScratch.Cells(r, modLibrary.PIN_COL_LABELY).Value = dNormY
+    End If
+    wsScratch.Cells(r, modLibrary.PIN_COL_NORMX).Value = dNormX
+    wsScratch.Cells(r, modLibrary.PIN_COL_NORMY).Value = dNormY
+
+    MoveAnchor = True
+End Function
+
+Public Function MoveMarker(wsScratch As Worksheet, ByVal sConnectorID As String, _
+                           ByVal nPinNumber As Long, ByVal dNormX As Double, ByVal dNormY As Double) As Boolean
+    Dim r As Long
+    r = FindPinRow(wsScratch, sConnectorID, nPinNumber)
+    If r = 0 Then Exit Function
+
+    wsScratch.Cells(r, modLibrary.PIN_COL_LABELX).Value = dNormX
+    wsScratch.Cells(r, modLibrary.PIN_COL_LABELY).Value = dNormY
+
+    MoveMarker = True
+End Function
+
+Public Function SnapLabelToPin(wsScratch As Worksheet, ByVal sConnectorID As String, _
+                               ByVal nPinNumber As Long) As Boolean
+    Dim r As Long
+    r = FindPinRow(wsScratch, sConnectorID, nPinNumber)
+    If r = 0 Then Exit Function
+
+    wsScratch.Cells(r, modLibrary.PIN_COL_LABELX).Value = wsScratch.Cells(r, modLibrary.PIN_COL_NORMX).Value
+    wsScratch.Cells(r, modLibrary.PIN_COL_LABELY).Value = wsScratch.Cells(r, modLibrary.PIN_COL_NORMY).Value
+
+    SnapLabelToPin = True
+End Function
+
+Public Function NeedsLeaderLine(wsScratch As Worksheet, ByVal sConnectorID As String, _
+                                ByVal nPinNumber As Long) As Boolean
+    Dim r As Long
+    r = FindPinRow(wsScratch, sConnectorID, nPinNumber)
+    If r = 0 Then Exit Function
+
+    NeedsLeaderLine = Not MarkerSitsOnAnchor( _
+        CDbl(wsScratch.Cells(r, modLibrary.PIN_COL_NORMX).Value), _
+        CDbl(wsScratch.Cells(r, modLibrary.PIN_COL_NORMY).Value), _
+        CDbl(wsScratch.Cells(r, modLibrary.PIN_COL_LABELX).Value), _
+        CDbl(wsScratch.Cells(r, modLibrary.PIN_COL_LABELY).Value))
 End Function
