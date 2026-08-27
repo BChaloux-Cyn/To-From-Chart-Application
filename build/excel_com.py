@@ -54,6 +54,17 @@ def import_module(wb, path: Path) -> None:
     wb.VBProject.VBComponents.Import(str(path))
 
 
+VBEXT_CT_MSFORM = 3
+
+
+def add_userform(wb, name: str):
+    """Add a UserForm component, named, returning its Designer surface -
+    the object controls are added to."""
+    component = wb.VBProject.VBComponents.Add(VBEXT_CT_MSFORM)
+    component.Name = name
+    return component.Designer
+
+
 def set_codename(wb, sheet, codename: str) -> None:
     """Rename a worksheet's VBA code name so its module can be addressed."""
     component = wb.VBProject.VBComponents(sheet.CodeName)

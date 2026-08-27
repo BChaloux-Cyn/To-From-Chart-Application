@@ -49,6 +49,8 @@ def build(out_dir: Path = DIST) -> Path:
             for codename, filename in SHEET_EVENTS:
                 source = (VBA_DIR / "sheets" / filename).read_text(encoding="utf-8")
                 excel_com.add_sheet_code(wb, codename, source)
+            smoke_form = excel_com.add_userform(wb, "frmSmokeTest")
+            smoke_form.Caption = "Smoke Test"
             excel_com.save_as_xlsm(wb, target)
         finally:
             wb.Close(SaveChanges=False)
