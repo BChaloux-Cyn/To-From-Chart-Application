@@ -128,3 +128,44 @@ Public Function RenameRefDes(ByVal sOldRefDes As String, ByVal sNewRefDes As Str
 
     RenameRefDes = True
 End Function
+
+Public Function RemoveConnectorInstance(ByVal sRefDes As String) As Boolean
+    Dim ws As Worksheet, wsChart As Worksheet
+    Dim r As Long, nLast As Long, c As Long
+
+    Set ws = ThisWorkbook.Worksheets(CONN_SHEET)
+    nLast = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+
+    r = 0
+    Dim i As Long
+    For i = CONN_FIRST_ROW To nLast
+        If StrComp(Trim$(CStr(ws.Cells(i, 1).Value)), sRefDes, vbTextCompare) = 0 Then
+            r = i
+            Exit For
+        End If
+    Next i
+    If r = 0 Then Exit Function
+
+    If r < nLast Then
+        For c = 1 To 6
+            ws.Cells(r, c).Value = ws.Cells(nLast, c).Value
+        Next c
+    End If
+    ws.Range(ws.Cells(nLast, 1), ws.Cells(nLast, 6)).ClearContents
+
+    Set wsChart = ThisWorkbook.Worksheets(modChart.CHART_SHEET)
+    For i = modChart.CHART_FIRST_ROW To modChart.CHART_LAST_ROW
+        If StrComp(Trim$(CStr(wsChart.Cells(i, modChart.COL_FROM_CONN).Value)), sRefDes, vbTextCompare) = 0 Then
+            wsChart.Cells(i, modChart.COL_FROM_CONN).ClearContents
+            wsChart.Cells(i, modChart.COL_FROM_PIN).Validation.Delete
+            wsChart.Cells(i, modChart.COL_FROM_PIN).ClearContents
+        End If
+        If StrComp(Trim$(CStr(wsChart.Cells(i, modChart.COL_TO_CONN).Value)), sRefDes, vbTextCompare) = 0 Then
+            wsChart.Cells(i, modChart.COL_TO_CONN).ClearContents
+            wsChart.Cells(i, modChart.COL_TO_PIN).Validation.Delete
+            wsChart.Cells(i, modChart.COL_TO_PIN).ClearContents
+        End If
+    Next i
+
+    RemoveConnectorInstance = True
+End Function
