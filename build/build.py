@@ -52,6 +52,7 @@ def build(out_dir: Path = DIST) -> Path:
             layout.build_check(sheets)
             layout.build_state(sheets, BUILD_VERSION)
             layout.build_home(sheets)
+            layout.build_snapshot(sheets)
             for name in VBA_MODULES:
                 excel_com.import_module(wb, VBA_DIR / name)
             for codename, filename in SHEET_EVENTS:

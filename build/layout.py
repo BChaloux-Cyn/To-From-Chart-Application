@@ -4,6 +4,8 @@ from __future__ import annotations
 VISIBLE = -1
 VERY_HIDDEN = 2
 
+import library_layout
+
 # (tab name, VBA code name, visibility)
 SHEETS = [
     ("Home", "shHome", VISIBLE),
@@ -290,3 +292,18 @@ def build_home(sheets) -> None:
         )
         shape.TextFrame2.TextRange.Text = caption
         shape.OnAction = macro
+
+
+SNAP_CONN_FIRST_ROW = 2
+SNAP_CONN_LAST_ROW = 201
+SNAP_PINS_HEADER_ROW = 210
+SNAP_PINS_FIRST_ROW = 211
+SNAP_PINS_LAST_ROW = 2210
+
+
+def build_snapshot(sheets) -> None:
+    sheet = sheets["_Snapshot"]
+    for index, header in enumerate(library_layout.CONN_HEADERS, start=1):
+        sheet.Cells(1, index).Value = header
+    for index, header in enumerate(library_layout.PIN_HEADERS, start=1):
+        sheet.Cells(SNAP_PINS_HEADER_ROW, index).Value = header
