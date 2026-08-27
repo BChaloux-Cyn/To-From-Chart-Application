@@ -93,3 +93,38 @@ Public Function PinCountFor(ByVal sRefDes As String) As Long
 
     PinCountFor = 0
 End Function
+
+Public Function RenameRefDes(ByVal sOldRefDes As String, ByVal sNewRefDes As String) As Boolean
+    Dim ws As Worksheet, wsChart As Worksheet
+    Dim r As Long, nLast As Long, nMatches As Long
+
+    sOldRefDes = Trim$(sOldRefDes)
+    sNewRefDes = Trim$(sNewRefDes)
+    If Len(sOldRefDes) = 0 Or Len(sNewRefDes) = 0 Then Exit Function
+    If StrComp(sOldRefDes, sNewRefDes, vbTextCompare) = 0 Then Exit Function
+
+    ' The renamed row already carries sNewRefDes by the time this runs (the
+    ' sheet edit happens before Worksheet_Change fires), so exactly one
+    ' match is the non-colliding case; more than one means a different row
+    ' already used that ref des.
+    Set ws = ThisWorkbook.Worksheets(CONN_SHEET)
+    nLast = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    For r = CONN_FIRST_ROW To nLast
+        If StrComp(Trim$(CStr(ws.Cells(r, 1).Value)), sNewRefDes, vbTextCompare) = 0 Then
+            nMatches = nMatches + 1
+        End If
+    Next r
+    If nMatches <> 1 Then Exit Function
+
+    Set wsChart = ThisWorkbook.Worksheets(modChart.CHART_SHEET)
+    For r = modChart.CHART_FIRST_ROW To modChart.CHART_LAST_ROW
+        If StrComp(Trim$(CStr(wsChart.Cells(r, modChart.COL_FROM_CONN).Value)), sOldRefDes, vbTextCompare) = 0 Then
+            wsChart.Cells(r, modChart.COL_FROM_CONN).Value = sNewRefDes
+        End If
+        If StrComp(Trim$(CStr(wsChart.Cells(r, modChart.COL_TO_CONN).Value)), sOldRefDes, vbTextCompare) = 0 Then
+            wsChart.Cells(r, modChart.COL_TO_CONN).Value = sNewRefDes
+        End If
+    Next r
+
+    RenameRefDes = True
+End Function
