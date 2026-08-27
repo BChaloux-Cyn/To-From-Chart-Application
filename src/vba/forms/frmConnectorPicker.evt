@@ -46,8 +46,33 @@ Private Sub cmdAdd_Click()
 End Sub
 
 Private Sub cmdNew_Click()
-    Unload Me
+    ' Cleared first (not just relying on frmConnectorEditor.cmdCancel_Click
+    ' to clear it) so a stale value from an earlier, unrelated save can
+    ' never cause this to wrongly re-add an old connector after a Cancel.
+    modConnectorUI.LastSavedConnectorID = ""
     frmConnectorEditor.Show
+
+    Dim sConnectorID As String
+    sConnectorID = modConnectorUI.LastSavedConnectorID
+    If Len(sConnectorID) > 0 Then
+        ' frmConnectorEditor's own Save closed mLibrary (Workbooks.Open on
+        ' an already-open path returns the same object) - reopen to read
+        ' the connector it just wrote.
+        Set mLibrary = Workbooks.Open(ThisWorkbook.Path & "\ConnectorLibrary.xlsx")
+
+        Dim vFields As Variant
+        vFields = modLibrary.ReadConnector(mLibrary.Worksheets("Connectors"), 2, modLibrary.LIB_ROW_CAP, sConnectorID)
+        If Not IsEmpty(vFields) Then
+            Dim sRefDes As String
+            sRefDes = modConnectors.AddConnectorInstance(vFields(1), vFields(2), vFields(4), vFields(5), CLng(vFields(6)))
+            If Len(sRefDes) > 0 Then
+                modSnapshot.SnapshotConnector ThisWorkbook.Worksheets("_Snapshot"), mLibrary.Worksheets("Connectors"), _
+                    mLibrary.Worksheets("Pins"), mLibrary.Worksheets("Photos"), sConnectorID
+            End If
+        End If
+    End If
+
+    Unload Me
 End Sub
 
 Private Sub cmdCancel_Click()

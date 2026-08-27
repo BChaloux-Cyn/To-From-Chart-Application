@@ -1,8 +1,20 @@
 Option Explicit
 
+' imgPhoto's design-time size (form_layout.py). Fitting must target this
+' fixed box, not imgPhoto.Width/Height - those get overwritten with each
+' fitted result, so using them as the box would shrink the photo further
+' on every subsequent load.
+Private Const PHOTO_BOX_WIDTH As Double = 180
+Private Const PHOTO_BOX_HEIGHT As Double = 180
+
+' Pin marker badge size - the Label control's default size is sized for
+' body text, not a small numbered dot on a photo.
+Private Const PIN_MARKER_SIZE As Double = 16
+
 Private mMarkers As Collection
 Private mListPinNumbers As Collection ' mirrors lstPins - item i+1 is the PinNumber shown at lstPins index i, since list position and PinNumber diverge once anything is deleted
 Private mConnectorID As String
+Private mOriginalConnectorID As String ' "" for a new connector; set by LoadForEdit so Save's uniqueness check can tell "still the connector I opened" from "collides with a different one"
 Private mNextPinNumber As Long
 Private mPhotoPath As String
 
@@ -10,7 +22,21 @@ Private Sub UserForm_Initialize()
     Set mMarkers = New Collection
     Set mListPinNumbers = New Collection
     mNextPinNumber = 1
-    cboType.ListIndex = 0
+
+    ' Populated here (ThisWorkbook-qualified), not via RowSource: an
+    ' unqualified RowSource string ("_Lists!D2:D5") resolves against
+    ' whichever workbook is ActiveWorkbook when the control binds, not
+    ' necessarily this one. frmManageLibrary's Edit flow has
+    ' ConnectorLibrary.xlsx active by the time this form loads, which left
+    ' the Type dropdown with no options at all.
+    Dim wsLists As Worksheet, r As Long
+    Set wsLists = ThisWorkbook.Worksheets("_Lists")
+    r = 2
+    Do While Len(Trim$(CStr(wsLists.Cells(r, 4).Value))) > 0
+        cboType.AddItem wsLists.Cells(r, 4).Value
+        r = r + 1
+    Loop
+    If cboType.ListCount > 0 Then cboType.ListIndex = 0
 End Sub
 
 ' Called (after Load, before Show) by frmManageLibrary's cmdEdit_Click,
@@ -20,6 +46,7 @@ End Sub
 ' 1-based Dim vResult(1 To 11) array modLibrary.ReadConnector returns.
 Public Sub LoadForEdit(ByVal sConnectorID As String, ByVal vFields As Variant, wsLibPhotos As Worksheet)
     mConnectorID = sConnectorID
+    mOriginalConnectorID = sConnectorID
 
     txtName.Text = CStr(vFields(2))
     txtManufacturer.Text = CStr(vFields(3))
@@ -28,31 +55,44 @@ Public Sub LoadForEdit(ByVal sConnectorID As String, ByVal vFields As Variant, w
     txtPinCount.Text = CStr(vFields(6))
     txtNotes.Text = CStr(vFields(7))
 
-    LoadExistingPhoto wsLibPhotos, sConnectorID
+    LoadExistingPhoto sConnectorID, wsLibPhotos
     RebuildPinListFromScratch
 End Sub
 
-Private Sub LoadExistingPhoto(wsLibPhotos As Worksheet, ByVal sConnectorID As String)
-    Dim shp As Shape
-    On Error Resume Next
-    Set shp = wsLibPhotos.Shapes("PHOTO_" & sConnectorID)
-    On Error GoTo 0
-    If shp Is Nothing Then Exit Sub
+' The embedded library Shape stays the source of truth for the harness
+' chart (EmbedConnectorPhoto/modSnapshot), but re-deriving a preview from
+' it here would mean re-exporting via Shape.Copy/Chart.Paste, which is
+' unreliable for VBA-triggered clipboard operations on this machine
+' (manual verification, phase-2-manual-verification.md, 2b/2c). Instead,
+' cmdSave_Click keeps a plain on-disk cache of the original photo file
+' (CachePhotoPath) alongside the library, purely via FileCopy - no
+' clipboard involved - and this reads straight from that cache.
+Private Sub LoadExistingPhoto(ByVal sConnectorID As String, wsLibPhotos As Worksheet)
+    Dim sCachePath As String
+    sCachePath = modLibrary.CachePhotoPath(ThisWorkbook.Path, sConnectorID, "jpg")
 
-    ' EmbedConnectorPhoto (and so modPinEditor.SaveConnector) always needs a
-    ' real file on disk, but a shape already embedded in the library has no
-    ' such file - export it to one in TEMP so cmdSave_Click can re-embed it
-    ' unchanged if the student edits fields without picking a new photo.
-    Dim sTempPath As String
-    sTempPath = Environ$("TEMP") & "\" & sConnectorID & "_edit.png"
-    If Not modLibrary.ExportShapeToFile(shp, sTempPath) Then Exit Sub
+    If Len(Dir$(sCachePath)) = 0 Then
+        ' No cache yet - predates this fix, or an earlier save's cache
+        ' write never happened (e.g. edited without ever picking a photo).
+        ' One-time backfill attempt from the embedded Shape: same
+        ' reliability caveat ExportShapeToFile always had (not guaranteed
+        ' to work - see manual verification, phase-2-manual-verification.md,
+        ' 2b/2c), but gives this connector a chance to get a cache going
+        ' forward instead of never having one.
+        Dim shp As Shape
+        On Error Resume Next
+        Set shp = wsLibPhotos.Shapes("PHOTO_" & sConnectorID)
+        On Error GoTo 0
+        If Not shp Is Nothing Then modLibrary.ExportShapeToFile shp, sCachePath, "JPG"
+    End If
+    If Len(Dir$(sCachePath)) = 0 Then Exit Sub
 
     Dim pic As IPictureDisp
-    Set pic = LoadPicture(sTempPath)
+    Set pic = LoadPicture(sCachePath)
     If pic Is Nothing Then Exit Sub
 
     Dim vFit As Variant
-    vFit = modPinEditor.FitAspectRatio(CDbl(pic.Width), CDbl(pic.Height), imgPhoto.Width, imgPhoto.Height)
+    vFit = modPinEditor.FitAspectRatio(CDbl(pic.Width), CDbl(pic.Height), PHOTO_BOX_WIDTH, PHOTO_BOX_HEIGHT)
     If IsEmpty(vFit) Then Exit Sub
 
     imgPhoto.PictureSizeMode = fmPictureSizeModeStretch
@@ -60,7 +100,7 @@ Private Sub LoadExistingPhoto(wsLibPhotos As Worksheet, ByVal sConnectorID As St
     imgPhoto.Width = vFit(0)
     imgPhoto.Height = vFit(1)
 
-    mPhotoPath = sTempPath
+    mPhotoPath = sCachePath
 End Sub
 
 Private Sub RebuildPinListFromScratch()
@@ -83,9 +123,23 @@ Private Sub RebuildPinListFromScratch()
 End Sub
 
 Private Sub cmdLoadPhoto_Click()
+    ' mConnectorID (below) is computed from Name/Part Number at the moment
+    ' the photo loads and never recomputed - placing pins before both are
+    ' filled in silently does nothing (mConnectorID is blank). Requiring
+    ' both first, rather than letting the photo load and pin placement fail
+    ' silently, is the fix flagged in phase-2-manual-verification.md.
+    If Len(Trim$(txtName.Text)) = 0 Or Len(Trim$(txtPartNumber.Text)) = 0 Then
+        MsgBox "Enter Name and Part Number before loading a photo.", vbExclamation
+        Exit Sub
+    End If
+
+    ' Restricted to JPG: LoadPicture's legacy OLE picture loader unreliably
+    ' rejects valid PNGs (error 481) on some Windows/Office configurations.
+    ' JPG loads reliably, so the file picker only offers formats LoadPicture
+    ' actually handles here rather than routing through a workaround.
     Dim sPath As String
     sPath = Application.GetOpenFilename( _
-        "Pictures (*.png; *.jpg; *.jpeg; *.bmp), *.png;*.jpg;*.jpeg;*.bmp")
+        "Pictures (*.jpg; *.jpeg), *.jpg;*.jpeg")
     If sPath = "False" Then Exit Sub
 
     Dim pic As IPictureDisp
@@ -95,7 +149,7 @@ Private Sub cmdLoadPhoto_Click()
     ' HIMETRIC-to-pixel conversion cancels out in a ratio - only the ratio
     ' between Width and Height matters here.
     Dim vFit As Variant
-    vFit = modPinEditor.FitAspectRatio(CDbl(pic.Width), CDbl(pic.Height), imgPhoto.Width, imgPhoto.Height)
+    vFit = modPinEditor.FitAspectRatio(CDbl(pic.Width), CDbl(pic.Height), PHOTO_BOX_WIDTH, PHOTO_BOX_HEIGHT)
     If IsEmpty(vFit) Then Exit Sub
 
     imgPhoto.PictureSizeMode = fmPictureSizeModeStretch
@@ -116,6 +170,17 @@ Private Sub imgPhoto_MouseUp(ByVal Button As Integer, ByVal Shift As Integer, _
     dNormY = Y / imgPhoto.Height
 
     If tglPlacePins.Value = True Then
+        Dim nPinCount As Long
+        If Not IsNumeric(txtPinCount.Text) Or CLng(Val(txtPinCount.Text)) <= 0 Then
+            MsgBox "Enter a valid Pin Count before placing pins.", vbExclamation
+            Exit Sub
+        End If
+        nPinCount = CLng(Val(txtPinCount.Text))
+        If lstPins.ListCount >= nPinCount Then
+            MsgBox "All " & CStr(nPinCount) & " pins have been placed.", vbExclamation
+            Exit Sub
+        End If
+
         Dim sLabel As String
         sLabel = "Pin " & CStr(mNextPinNumber)
 
@@ -169,6 +234,9 @@ Private Sub AddMarkerControl(ByVal nPinNumber As Long, ByVal sngX As Single, ByV
     Dim lbl As MSForms.Label
     Set lbl = Me.Controls.Add("Forms.Label.1", "lblMarker" & CStr(nPinNumber), True)
     lbl.Caption = CStr(nPinNumber)
+    lbl.Width = PIN_MARKER_SIZE
+    lbl.Height = PIN_MARKER_SIZE
+    lbl.Font.Size = 8
     lbl.Left = imgPhoto.Left + sngX - (lbl.Width / 2)
     lbl.Top = imgPhoto.Top + sngY - (lbl.Height / 2)
     lbl.TextAlign = fmTextAlignCenter
@@ -228,6 +296,16 @@ Private Sub cmdSave_Click()
     Dim lib As Workbook
     Set lib = Workbooks.Open(ThisWorkbook.Path & "\ConnectorLibrary.xlsx")
 
+    ' A collision only matters when the row it would overwrite belongs to a
+    ' DIFFERENT connector than the one this session opened for editing -
+    ' re-saving the connector you're editing, unchanged, must not flag itself.
+    If modLibrary.FindConnectorRow(lib.Worksheets("Connectors"), 2, modLibrary.LIB_ROW_CAP, mConnectorID) > 0 _
+            And StrComp(mConnectorID, mOriginalConnectorID, vbTextCompare) <> 0 Then
+        MsgBox "Part Number already exists in the library (" & mConnectorID & "). Choose a different Part Number.", vbExclamation
+        lib.Close SaveChanges:=False
+        Exit Sub
+    End If
+
     Dim sNowUtc As String
     sNowUtc = Format$(Now, "yyyy-mm-ddThh:mm:ssZ")
 
@@ -238,6 +316,24 @@ Private Sub cmdSave_Click()
             sNowUtc, sNowUtc, "Local") Then
         lib.Save
         lib.Close SaveChanges:=False
+
+        ' Refresh the on-disk preview cache LoadExistingPhoto reads from -
+        ' a plain file copy, no clipboard involved (see LoadExistingPhoto).
+        ' Skipped when mPhotoPath already *is* the cache file (editing
+        ' without picking a new photo): FileCopy onto itself errors.
+        Dim sCachePath As String
+        sCachePath = modLibrary.CachePhotoPath(ThisWorkbook.Path, mConnectorID, "jpg")
+        If Len(mPhotoPath) > 0 And StrComp(mPhotoPath, sCachePath, vbTextCompare) <> 0 Then
+            FileCopy mPhotoPath, sCachePath
+        End If
+
+        ' A standard module's variable, not a property on this form: this
+        ' form unloads itself right below, and re-reading a property off a
+        ' just-unloaded predeclared instance risks silently re-triggering
+        ' UserForm_Initialize (which would reset it) rather than returning
+        ' the value just set - a real risk given this session's experience
+        ' with this form's Load/Show/Unload lifecycle being surprising.
+        modConnectorUI.LastSavedConnectorID = mConnectorID
         Unload Me
     Else
         lib.Close SaveChanges:=False

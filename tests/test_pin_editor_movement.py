@@ -77,3 +77,23 @@ def test_move_unknown_pin_returns_false(wb):
     assert run(wb, "modPinEditor.MoveAnchor", sheet, "J1", 99, 0.1, 0.1) is False
     assert run(wb, "modPinEditor.MoveMarker", sheet, "J1", 99, 0.1, 0.1) is False
     assert run(wb, "modPinEditor.SnapLabelToPin", sheet, "J1", 99) is False
+
+
+def test_pin_geometry_returns_anchor_and_label_coordinates(wb):
+    # Added alongside NeedsLeaderLine for a leader-line visual indicator
+    # (phase-2-manual-verification.md, 2b) - deferred (Forms.Line.1 isn't
+    # available on this machine), but the read helper is correct and kept
+    # for whenever the visual is added back.
+    sheet = wb.Worksheets("_Edit")
+    place(wb, sheet, x=0.2, y=0.2)
+    run(wb, "modPinEditor.MoveMarker", sheet, "J1", 1, 0.9, 0.8)
+
+    result = run(wb, "modPinEditor.PinGeometry", sheet, "J1", 1)
+
+    assert tuple(result) == (0.2, 0.2, 0.9, 0.8)
+
+
+def test_pin_geometry_for_unknown_pin_is_empty(wb):
+    sheet = wb.Worksheets("_Edit")
+    result = run(wb, "modPinEditor.PinGeometry", sheet, "J1", 99)
+    assert result is None

@@ -30,18 +30,55 @@ def test_picker_new_launches_the_connector_editor(wb):
     assert "frmConnectorEditor" in module_source(wb, "frmConnectorPicker")
 
 
+def test_picker_new_chains_into_adding_an_instance_of_what_was_just_saved(wb):
+    # Feature added during manual verification (phase-2-manual-verification.md,
+    # 2c): creating a brand-new connector via "New..." from the Add
+    # Connector dialog should immediately add an instance of it too, rather
+    # than requiring a second trip back through the picker.
+    source = module_source(wb, "frmConnectorPicker")
+    new_click = source[source.index("Private Sub cmdNew_Click"):]
+    body = new_click.split("End Sub", 1)[0]
+    assert "modConnectorUI.LastSavedConnectorID = \"\"" in body
+    assert "modConnectors.AddConnectorInstance" in body
+    assert "modSnapshot.SnapshotConnector" in body
+    # Show must come before reading LastSavedConnectorID - it's only set
+    # once frmConnectorEditor's Save actually runs.
+    assert body.index("frmConnectorEditor.Show") < body.index("modConnectorUI.LastSavedConnectorID")
+
+
+def test_connector_editor_save_records_the_saved_id_for_callers(wb):
+    source = module_source(wb, "frmConnectorEditor")
+    save_click = source[source.index("Private Sub cmdSave_Click"):]
+    body = save_click.split("End Sub", 1)[0]
+    assert "modConnectorUI.LastSavedConnectorID = mConnectorID" in body
+
+
 def test_manage_library_edit_launches_the_connector_editor(wb):
     source = module_source(wb, "frmManageLibrary")
     assert "frmConnectorEditor" in source
     assert "LoadScratchPins" in source
 
 
-def test_manage_library_edit_passes_connector_fields_before_closing_the_library(wb):
-    # cmdEdit_Click must read the connector's fields and hand them to
-    # frmConnectorEditor.LoadForEdit while mLibrary is still open - the
-    # library workbook is closed right after, so LoadForEdit has no second
-    # chance to read from it.
+def test_manage_library_edit_passes_connector_fields_to_the_editor(wb):
+    # cmdEdit_Click must read the connector's fields (vFields, via
+    # ReadConnector) and the Photos sheet, and hand both to
+    # frmConnectorEditor.LoadForEdit while mLibrary is still open. The photo
+    # preview normally comes from an on-disk cache (modLibrary.CachePhotoPath),
+    # but LoadExistingPhoto falls back to a live Shape read from Photos as a
+    # one-time backfill when no cache exists yet.
     assert "LoadForEdit" in module_source(wb, "frmManageLibrary")
+
+
+def test_manage_library_edit_shows_the_editor_before_unloading_itself(wb):
+    # Manual verification (phase-2-manual-verification.md, 2c) found that
+    # unloading frmManageLibrary (Unload Me) before showing frmConnectorEditor
+    # - while still inside frmManageLibrary's own click handler - discarded
+    # everything LoadForEdit had just populated (frmConnectorEditor came up
+    # blank, UserForm_Initialize visibly re-firing). Show must come first.
+    source = module_source(wb, "frmManageLibrary")
+    click = source[source.index("Private Sub cmdEdit_Click"):]
+    body = click.split("End Sub", 1)[0]
+    assert body.index("frmConnectorEditor.Show") < body.index("Unload Me")
 
 
 def test_connector_editor_supports_loading_an_existing_connector(wb):
@@ -54,6 +91,30 @@ def test_manage_library_delete_calls_library_delete_functions(wb):
     source = module_source(wb, "frmManageLibrary")
     assert "modLibrary.DeleteConnector" in source
     assert "modLibrary.DeletePinsForConnector" in source
+
+
+def test_manage_library_delete_also_removes_the_photo_cache_file(wb):
+    # The editor-preview cache (modLibrary.CachePhotoPath, introduced
+    # alongside the LoadExistingPhoto fix) would otherwise be orphaned once
+    # its connector no longer exists.
+    source = module_source(wb, "frmManageLibrary")
+    delete_click = source[source.index("Private Sub cmdDelete_Click"):]
+    body = delete_click.split("End Sub", 1)[0]
+    assert "modLibrary.CachePhotoPath(ThisWorkbook.Path, sConnectorID, \"jpg\")" in body
+    assert "Kill sCachePath" in body
+
+
+@pytest.mark.parametrize("form_name", ["frmConnectorPicker", "frmManageLibrary"])
+def test_controls_fit_within_the_form_width(wb, form_name):
+    # Manual verification (phase-2-manual-verification.md, 2c) found
+    # frmManageLibrary's form too narrow to show all 5 buttons - Export and
+    # Close rendered past the form's right edge (a regression from when
+    # Import/Export were added without widening the form to match).
+    component = wb.VBProject.VBComponents(form_name)
+    form_width = component.Properties("Width").Value
+    for ctl in component.Designer.Controls:
+        assert ctl.Left + ctl.Width <= form_width, \
+            f"{form_name}.{ctl.Name} extends past the form's right edge ({ctl.Left + ctl.Width} > {form_width})"
 
 
 def test_home_has_the_three_new_buttons(wb):

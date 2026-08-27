@@ -282,9 +282,21 @@ Public Function EmbedConnectorPhoto(wsPhotos As Worksheet, ByVal sConnectorID As
     Dim sShapeName As String, nIndex As Long, nCol As Long, nRow As Long
     Dim shp As Shape
 
-    If Len(Dir$(sImagePath)) = 0 Then Exit Function
-
     sShapeName = "PHOTO_" & sConnectorID
+
+    If Len(Dir$(sImagePath)) = 0 Then
+        ' No new photo to embed - if one is already embedded for this
+        ' connector (editing without picking a new photo, or the
+        ' Edit-flow's re-export of the existing one failed - see
+        ' ExportShapeToFile), keep it rather than failing the whole save.
+        ' Only a genuinely new connector with no prior photo returns "".
+        On Error Resume Next
+        Dim bExists As Boolean
+        bExists = Not (wsPhotos.Shapes(sShapeName) Is Nothing)
+        On Error GoTo 0
+        If bExists Then EmbedConnectorPhoto = sShapeName
+        Exit Function
+    End If
     RemoveConnectorPhoto wsPhotos, sConnectorID
 
     nIndex = wsPhotos.Shapes.Count
@@ -299,7 +311,8 @@ Public Function EmbedConnectorPhoto(wsPhotos As Worksheet, ByVal sConnectorID As
     EmbedConnectorPhoto = sShapeName
 End Function
 
-Public Function CachePhotoPath(ByVal sWorkbookFolder As String, ByVal sConnectorID As String) As String
+Public Function CachePhotoPath(ByVal sWorkbookFolder As String, ByVal sConnectorID As String, _
+                               Optional ByVal sExtension As String = "png") As String
     Dim sFolder As String
 
     sFolder = sWorkbookFolder
@@ -307,23 +320,43 @@ Public Function CachePhotoPath(ByVal sWorkbookFolder As String, ByVal sConnector
     sFolder = sFolder & "Photos\"
     If Len(Dir$(sFolder, vbDirectory)) = 0 Then MkDir sFolder
 
-    CachePhotoPath = sFolder & sConnectorID & ".png"
+    CachePhotoPath = sFolder & sConnectorID & "." & sExtension
 End Function
 
-Public Function ExportShapeToFile(shp As Shape, ByVal sPath As String) As Boolean
+Public Function ExportShapeToFile(ByVal shp As Shape, ByVal sPath As String, _
+                                  Optional ByVal sFormat As String = "PNG") As Boolean
     ' Excel has no direct "export a Shape to an image file" call. Pasting it
     ' into a throwaway ChartObject on the shape's own sheet and exporting
-    ' the chart is the standard workaround - and, unlike Worksheet.Paste,
-    ' Chart.Paste does not require the host sheet to be active, so this
-    ' works even when shp's parent sheet is very hidden (_Snapshot, _Edit).
+    ' the chart is the standard workaround. Chart.Paste's clipboard target
+    ' must be the ActiveSheet, though, and a very hidden sheet (_Snapshot,
+    ' _Edit) can never become active - so exporting a shape that lives on
+    ' one silently pastes nothing unless that sheet is temporarily made
+    ' visible and activated for the duration of the export.
     Dim wsHost As Worksheet, cht As ChartObject
+    Dim nOriginalVisible As XlSheetVisibility, bWasHidden As Boolean
 
     Set wsHost = shp.Parent
+    nOriginalVisible = wsHost.Visible
+    bWasHidden = (nOriginalVisible <> xlSheetVisible)
+    If bWasHidden Then
+        wsHost.Visible = xlSheetVisible
+        wsHost.Activate
+        ' A shape reference obtained while its sheet was still very hidden
+        ' copies as empty even after the sheet is unhidden and activated -
+        ' re-fetching it by name once the sheet is active is required.
+        Set shp = wsHost.Shapes(shp.Name)
+    End If
+
     shp.Copy
     Set cht = wsHost.ChartObjects.Add(0, 0, shp.Width, shp.Height)
     cht.Chart.Paste
-    cht.Chart.Export sPath, "PNG"
+
+    Dim bPasted As Boolean
+    bPasted = (cht.Chart.Shapes.Count > 0)
+    If bPasted Then cht.Chart.Export sPath, sFormat
     cht.Delete
 
-    ExportShapeToFile = (Len(Dir$(sPath)) > 0)
+    If bWasHidden Then wsHost.Visible = nOriginalVisible
+
+    ExportShapeToFile = bPasted And (Len(Dir$(sPath)) > 0)
 End Function

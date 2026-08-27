@@ -36,21 +36,29 @@ Public Function SnapshotConnector(wsSnap As Worksheet, wsLibConn As Worksheet, w
         Next i
     End If
 
+    ' frmConnectorEditor.cmdSave_Click keeps a jpg cache (CachePhotoPath's
+    ' extension override) alongside the library via a plain FileCopy - no
+    ' clipboard involved, see LoadExistingPhoto - so prefer that.
     Dim sCachePath As String
-    sCachePath = modLibrary.CachePhotoPath(LibraryFolder(), sConnectorID)
+    sCachePath = modLibrary.CachePhotoPath(LibraryFolder(), sConnectorID, "jpg")
     If Len(Dir$(sCachePath)) = 0 Then
-        ' No local cache file yet (e.g. the sample fixture in this plan's
-        ' own tests never wrote one) - export the shape straight off the
-        ' library's own Photos sheet into the cache instead of failing the
-        ' snapshot. _Snapshot is very hidden, so a direct Shape.Copy /
-        ' Worksheet.Paste onto it fails (Paste requires the target to be
-        ' the active sheet, and Excel refuses to activate a very-hidden
-        ' one) - ExportShapeToFile sidesteps that via a throwaway chart.
-        Dim shp As Shape
-        On Error Resume Next
-        Set shp = wsLibPhotos.Shapes("PHOTO_" & sConnectorID)
-        On Error GoTo 0
-        If Not shp Is Nothing Then modLibrary.ExportShapeToFile shp, sCachePath
+        ' Falls back to the older png cache / Shape re-export path for a
+        ' connector saved before the jpg cache existed. _Snapshot is very
+        ' hidden, so a direct Shape.Copy/Worksheet.Paste onto it fails
+        ' (Paste requires the target to be the active sheet, and Excel
+        ' refuses to activate a very-hidden one) - ExportShapeToFile
+        ' sidesteps that via a throwaway chart, but is unreliable for
+        ' VBA-triggered clipboard operations on this machine (manual
+        ' verification, phase-2-manual-verification.md, 2b/2c) - this
+        ' fallback exists for older libraries, not relied on going forward.
+        sCachePath = modLibrary.CachePhotoPath(LibraryFolder(), sConnectorID)
+        If Len(Dir$(sCachePath)) = 0 Then
+            Dim shp As Shape
+            On Error Resume Next
+            Set shp = wsLibPhotos.Shapes("PHOTO_" & sConnectorID)
+            On Error GoTo 0
+            If Not shp Is Nothing Then modLibrary.ExportShapeToFile shp, sCachePath
+        End If
     End If
 
     If Len(Dir$(sCachePath)) > 0 Then

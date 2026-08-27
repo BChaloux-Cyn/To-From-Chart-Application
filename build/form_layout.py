@@ -9,7 +9,6 @@ FORM_HEIGHT = 420
 
 TYPE_CHOICES = ["Connector", "Stud", "Splice", "Tail"]
 TYPE_LIST_COLUMN = 4
-TYPE_LIST_COLUMN_LETTER = "D"
 
 # (control ProgID, name, left, top, width, height, extra properties)
 FIELD_CONTROLS = [
@@ -58,18 +57,19 @@ def build_connector_editor_form(wb, add_userform) -> None:
         for prop, value in extra.items():
             setattr(control, prop, value)
 
-    # ComboBox.AddItem only populates the control's live runtime state - it
-    # is not written into the .frx property bag, so the list is empty again
-    # after SaveAs/reopen. RowSource bound to a worksheet range is what
-    # actually persists, the same mechanism this workbook's other pick lists
-    # (_Lists + Harness chart validation) already rely on.
+    # _Lists!D2:D5 remains the source of truth for the Type choices, read
+    # explicitly (ThisWorkbook-qualified) by frmConnectorEditor's
+    # UserForm_Initialize at runtime - not via RowSource, which is an
+    # unqualified "_Lists!D2:D5" string that resolves against whichever
+    # workbook is ActiveWorkbook when the control binds, not necessarily
+    # this one. That bit manual verification (phase-2-manual-verification.md,
+    # 2c): frmManageLibrary's Edit flow has ConnectorLibrary.xlsx active by
+    # the time frmConnectorEditor loads, so RowSource silently resolved to
+    # nothing there.
     lists_sheet = wb.Worksheets("_Lists")
     lists_sheet.Cells(1, TYPE_LIST_COLUMN).Value = "Type"
     for offset, choice in enumerate(TYPE_CHOICES):
         lists_sheet.Cells(offset + 2, TYPE_LIST_COLUMN).Value = choice
-
-    combo = designer.Controls("cboType")
-    combo.RowSource = "_Lists!{0}2:{0}{1}".format(TYPE_LIST_COLUMN_LETTER, len(TYPE_CHOICES) + 1)
 
 
 PICKER_NAME = "frmConnectorPicker"
@@ -81,8 +81,12 @@ PICKER_CONTROLS = [
 ]
 
 MANAGE_LIBRARY_NAME = "frmManageLibrary"
+# 5 buttons (Edit/Delete/Import/Export/Close, added across 2c/2d) need more
+# width than frmConnectorPicker's 3-button layout - the form itself must be
+# widened to match, or the last two buttons render past its right edge.
+MANAGE_LIBRARY_WIDTH = 440
 MANAGE_LIBRARY_CONTROLS = [
-    ("Forms.ListBox.1", "lstConnectors", 12, 12, 300, 200, {}),
+    ("Forms.ListBox.1", "lstConnectors", 12, 12, 416, 200, {}),
     ("Forms.CommandButton.1", "cmdEdit", 12, 220, 80, 24, {"Caption": "Edit"}),
     ("Forms.CommandButton.1", "cmdDelete", 96, 220, 80, 24, {"Caption": "Delete"}),
     ("Forms.CommandButton.1", "cmdImport", 180, 220, 80, 24, {"Caption": "Import..."}),
@@ -114,8 +118,13 @@ def _build_form(wb, add_userform, name, caption, width, height, control_specs):
 
 
 def build_connector_picker_form(wb, add_userform) -> None:
-    _build_form(wb, add_userform, PICKER_NAME, "Add Connector", 340, 260, PICKER_CONTROLS)
+    # Same fix as MANAGE_LIBRARY: buttons bottom out at Top(220) + Height(24)
+    # = 244 - 260 left only a 16px margin, which rendered as buttons cut off
+    # at the bottom (phase-2-manual-verification.md, 2c manual verification).
+    _build_form(wb, add_userform, PICKER_NAME, "Add Connector", 340, 300, PICKER_CONTROLS)
 
 
 def build_manage_library_form(wb, add_userform) -> None:
-    _build_form(wb, add_userform, MANAGE_LIBRARY_NAME, "Manage Library", 340, 260, MANAGE_LIBRARY_CONTROLS)
+    # cmdEdit/etc. bottom out at Top(220) + Height(24) = 244 - 260 left only
+    # a 16px margin below them, which read as "not tall enough" once shown.
+    _build_form(wb, add_userform, MANAGE_LIBRARY_NAME, "Manage Library", MANAGE_LIBRARY_WIDTH, 300, MANAGE_LIBRARY_CONTROLS)

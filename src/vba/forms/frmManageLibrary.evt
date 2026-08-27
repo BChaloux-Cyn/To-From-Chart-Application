@@ -35,14 +35,20 @@ Private Sub cmdEdit_Click()
     modPinEditor.LoadScratchPins ThisWorkbook.Worksheets("_Edit"), mLibrary.Worksheets("Pins"), sConnectorID
 
     ' Load (not Show) instantiates frmConnectorEditor and runs its
-    ' UserForm_Initialize, so LoadForEdit can populate it - all while
-    ' mLibrary is still open, since LoadForEdit reads the connector's photo
-    ' shape straight off mLibrary's Photos sheet.
+    ' UserForm_Initialize, so LoadForEdit can populate it before the form is
+    ' shown. LoadForEdit reads the photo preview from an on-disk cache
+    ' (modLibrary.CachePhotoPath); wsLibPhotos is only needed as a backfill
+    ' source if that cache doesn't exist yet (see LoadExistingPhoto).
     Load frmConnectorEditor
     frmConnectorEditor.LoadForEdit sConnectorID, vFields, mLibrary.Worksheets("Photos")
 
-    Unload Me
+    ' Unloading Me (this form) before showing frmConnectorEditor - while
+    ' still inside this form's own click handler - was observed to discard
+    ' everything LoadForEdit just populated (frmConnectorEditor came up
+    ' blank, UserForm_Initialize visibly re-firing). Show first (modal, so
+    ' this blocks until the student closes it via Save/Cancel), then unload.
     frmConnectorEditor.Show
+    Unload Me
 End Sub
 
 Private Sub cmdDelete_Click()
@@ -57,6 +63,13 @@ Private Sub cmdDelete_Click()
     modLibrary.DeletePinsForConnector mLibrary.Worksheets("Pins"), 2, modLibrary.LIB_ROW_CAP, sConnectorID
     modLibrary.RemoveConnectorPhoto mLibrary.Worksheets("Photos"), sConnectorID
     mLibrary.Save
+
+    ' Also remove the editor's on-disk preview cache (modLibrary.CachePhotoPath)
+    ' - otherwise it's orphaned, since nothing else ever reads a cache file
+    ' whose connector no longer exists.
+    Dim sCachePath As String
+    sCachePath = modLibrary.CachePhotoPath(ThisWorkbook.Path, sConnectorID, "jpg")
+    If Len(Dir$(sCachePath)) > 0 Then Kill sCachePath
 
     RefreshList
 End Sub

@@ -147,6 +147,22 @@ Public Function NeedsLeaderLine(wsScratch As Worksheet, ByVal sConnectorID As St
         CDbl(wsScratch.Cells(r, modLibrary.PIN_COL_LABELY).Value))
 End Function
 
+' Array(anchorNormX, anchorNormY, labelNormX, labelNormY), or Empty if the
+' pin isn't found. Lets a caller (the leader-line drawing code) place both
+' endpoints without duplicating FindPinRow/column lookups itself.
+Public Function PinGeometry(wsScratch As Worksheet, ByVal sConnectorID As String, _
+                            ByVal nPinNumber As Long) As Variant
+    Dim r As Long
+    r = FindPinRow(wsScratch, sConnectorID, nPinNumber)
+    If r = 0 Then Exit Function
+
+    PinGeometry = Array( _
+        CDbl(wsScratch.Cells(r, modLibrary.PIN_COL_NORMX).Value), _
+        CDbl(wsScratch.Cells(r, modLibrary.PIN_COL_NORMY).Value), _
+        CDbl(wsScratch.Cells(r, modLibrary.PIN_COL_LABELX).Value), _
+        CDbl(wsScratch.Cells(r, modLibrary.PIN_COL_LABELY).Value))
+End Function
+
 Public Function FitAspectRatio(ByVal dSourceWidth As Double, ByVal dSourceHeight As Double, _
                                ByVal dBoxWidth As Double, ByVal dBoxHeight As Double) As Variant
     Dim dSourceRatio As Double, dBoxRatio As Double, dOutWidth As Double, dOutHeight As Double
