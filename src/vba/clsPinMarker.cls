@@ -18,6 +18,10 @@ Private WithEvents mLabel As MSForms.Label
 Private mDragging As Boolean
 Private mGrabDx As Single, mGrabDy As Single
 
+Public Property Get LabelControl() As MSForms.Label
+    Set LabelControl = mLabel
+End Property
+
 Public Property Set LabelControl(ByVal ctl As MSForms.Label)
     Set mLabel = ctl
 End Property

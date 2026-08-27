@@ -27,6 +27,13 @@ def test_pin_marker_calls_move_marker_on_drop(wb):
     assert "modPinEditor.MoveMarker" in module_source(wb, "clsPinMarker")
 
 
+def test_pin_marker_label_control_is_readable(wb):
+    # LabelControl must be readable, not just settable: frmConnectorEditor
+    # reads it back (cmdClearPins_Click, RepositionMarkerControl) to find
+    # the on-screen Label tied to a given pin.
+    assert "Property Get LabelControl" in module_source(wb, "clsPinMarker")
+
+
 @pytest.mark.parametrize(
     "handler",
     [
@@ -43,5 +50,16 @@ def test_form_calls_into_the_tested_logic_module_for_every_pin_action(wb):
     for call in (
         "modPinEditor.PlacePin", "modPinEditor.RemovePin", "modPinEditor.ClearScratchPins",
         "modPinEditor.SnapLabelToPin", "modPinEditor.SaveConnector", "modPinEditor.FitAspectRatio",
+        "modPinEditor.MoveAnchor",
     ):
         assert call in source
+
+
+def test_form_tracks_pin_numbers_independently_of_list_position(wb):
+    # lstPins position and PinNumber diverge once anything is deleted -
+    # cmdDeletePin_Click/cmdSnapLabel_Click must resolve the pin number
+    # through mListPinNumbers rather than assuming ListIndex + 1 == PinNumber.
+    source = module_source(wb, "frmConnectorEditor")
+    assert "mListPinNumbers" in source
+    assert "RemovePin ThisWorkbook.Worksheets(\"_Edit\"), mConnectorID, lstPins.ListIndex + 1" not in source
+    assert "SnapLabelToPin ThisWorkbook.Worksheets(\"_Edit\"), mConnectorID, lstPins.ListIndex + 1" not in source

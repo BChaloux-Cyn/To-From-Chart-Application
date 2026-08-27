@@ -1,12 +1,14 @@
 Option Explicit
 
 Private mMarkers As Collection
+Private mListPinNumbers As Collection ' mirrors lstPins - item i+1 is the PinNumber shown at lstPins index i, since list position and PinNumber diverge once anything is deleted
 Private mConnectorID As String
 Private mNextPinNumber As Long
 Private mPhotoPath As String
 
 Private Sub UserForm_Initialize()
     Set mMarkers = New Collection
+    Set mListPinNumbers = New Collection
     mNextPinNumber = 1
     cboType.ListIndex = 0
 End Sub
@@ -38,22 +40,60 @@ End Sub
 
 Private Sub imgPhoto_MouseUp(ByVal Button As Integer, ByVal Shift As Integer, _
                              ByVal X As Single, ByVal Y As Single)
-    If tglPlacePins.Value <> True Then Exit Sub
     If Len(mConnectorID) = 0 Then Exit Sub
 
     Dim dNormX As Double, dNormY As Double
     dNormX = X / imgPhoto.Width
     dNormY = Y / imgPhoto.Height
 
-    Dim sLabel As String
-    sLabel = "Pin " & CStr(mNextPinNumber)
+    If tglPlacePins.Value = True Then
+        Dim sLabel As String
+        sLabel = "Pin " & CStr(mNextPinNumber)
 
-    If modPinEditor.PlacePin(ThisWorkbook.Worksheets("_Edit"), mConnectorID, mNextPinNumber, _
-                             sLabel, dNormX, dNormY) Then
-        AddMarkerControl mNextPinNumber, X, Y
-        lstPins.AddItem sLabel
-        mNextPinNumber = mNextPinNumber + 1
+        If modPinEditor.PlacePin(ThisWorkbook.Worksheets("_Edit"), mConnectorID, mNextPinNumber, _
+                                 sLabel, dNormX, dNormY) Then
+            AddMarkerControl mNextPinNumber, X, Y
+            lstPins.AddItem sLabel
+            mListPinNumbers.Add mNextPinNumber
+            mNextPinNumber = mNextPinNumber + 1
+        End If
+    ElseIf lstPins.ListIndex >= 0 Then
+        ' A pin is selected and Place Pins is off - clicking the image moves
+        ' that pin's anchor. The marker travels with it only if it was still
+        ' sitting on the anchor (modPinEditor.MoveAnchor decides that); either
+        ' way, reposition the on-screen marker to match its new label position.
+        Dim nPinNumber As Long
+        nPinNumber = mListPinNumbers(lstPins.ListIndex + 1)
+        If modPinEditor.MoveAnchor(ThisWorkbook.Worksheets("_Edit"), mConnectorID, nPinNumber, dNormX, dNormY) Then
+            RepositionMarkerControl nPinNumber
+        End If
     End If
+End Sub
+
+Private Sub RepositionMarkerControl(ByVal nPinNumber As Long)
+    Dim marker As clsPinMarker
+    On Error Resume Next
+    Set marker = mMarkers(CStr(nPinNumber))
+    On Error GoTo 0
+    If marker Is Nothing Then Exit Sub
+
+    Dim vPins As Variant, i As Long, dLabelX As Double, dLabelY As Double
+    vPins = modLibrary.ReadPinsForConnector(ThisWorkbook.Worksheets("_Edit"), _
+        modPinEditor.SCRATCH_FIRST_ROW, modPinEditor.SCRATCH_LAST_ROW, mConnectorID)
+    If IsEmpty(vPins) Then Exit Sub
+
+    For i = LBound(vPins, 1) To UBound(vPins, 1)
+        If CLng(vPins(i, 2)) = nPinNumber Then
+            dLabelX = CDbl(vPins(i, 6))
+            dLabelY = CDbl(vPins(i, 7))
+            Exit For
+        End If
+    Next i
+
+    Dim lbl As MSForms.Label
+    Set lbl = marker.LabelControl
+    lbl.Left = imgPhoto.Left + dLabelX * imgPhoto.Width - (lbl.Width / 2)
+    lbl.Top = imgPhoto.Top + dLabelY * imgPhoto.Height - (lbl.Height / 2)
 End Sub
 
 Private Sub AddMarkerControl(ByVal nPinNumber As Long, ByVal sngX As Single, ByVal sngY As Single)
@@ -80,13 +120,14 @@ End Sub
 Private Sub cmdDeletePin_Click()
     If lstPins.ListIndex < 0 Then Exit Sub
     Dim nPinNumber As Long
-    nPinNumber = lstPins.ListIndex + 1
+    nPinNumber = mListPinNumbers(lstPins.ListIndex + 1)
 
     modPinEditor.RemovePin ThisWorkbook.Worksheets("_Edit"), mConnectorID, nPinNumber
     On Error Resume Next
     Me.Controls.Remove "lblMarker" & CStr(nPinNumber)
     mMarkers.Remove CStr(nPinNumber)
     On Error GoTo 0
+    mListPinNumbers.Remove lstPins.ListIndex + 1
     lstPins.RemoveItem lstPins.ListIndex
 End Sub
 
@@ -100,13 +141,18 @@ Private Sub cmdClearPins_Click()
         On Error GoTo 0
     Next marker
     Set mMarkers = New Collection
+    Set mListPinNumbers = New Collection
     lstPins.Clear
     mNextPinNumber = 1
 End Sub
 
 Private Sub cmdSnapLabel_Click()
     If lstPins.ListIndex < 0 Then Exit Sub
-    modPinEditor.SnapLabelToPin ThisWorkbook.Worksheets("_Edit"), mConnectorID, lstPins.ListIndex + 1
+    Dim nPinNumber As Long
+    nPinNumber = mListPinNumbers(lstPins.ListIndex + 1)
+    If modPinEditor.SnapLabelToPin(ThisWorkbook.Worksheets("_Edit"), mConnectorID, nPinNumber) Then
+        RepositionMarkerControl nPinNumber
+    End If
 End Sub
 
 Private Sub cmdSave_Click()
