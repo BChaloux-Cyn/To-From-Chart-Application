@@ -166,3 +166,32 @@ Public Function FitAspectRatio(ByVal dSourceWidth As Double, ByVal dSourceHeight
 
     FitAspectRatio = Array(dOutWidth, dOutHeight)
 End Function
+
+Public Function SaveConnector(wsLibConn As Worksheet, wsLibPins As Worksheet, wsLibPhotos As Worksheet, _
+                              wsScratch As Worksheet, ByVal sConnectorID As String, ByVal sName As String, _
+                              ByVal sManufacturer As String, ByVal sPartNumber As String, ByVal sType As String, _
+                              ByVal nPinCount As Long, ByVal sNotes As String, ByVal sPhotoPath As String, _
+                              ByVal sCreatedUtc As String, ByVal sModifiedUtc As String, ByVal sOrigin As String) As Boolean
+    Dim sShapeName As String, vPins As Variant, vFields As Variant, i As Long
+
+    sShapeName = modLibrary.EmbedConnectorPhoto(wsLibPhotos, sConnectorID, sPhotoPath)
+    If Len(sShapeName) = 0 Then Exit Function
+
+    vFields = Array(sConnectorID, sName, sManufacturer, sPartNumber, sType, nPinCount, _
+                     sNotes, sShapeName, sCreatedUtc, sModifiedUtc, sOrigin)
+    If Not modLibrary.WriteConnector(wsLibConn, 2, modLibrary.LIB_ROW_CAP, vFields) Then Exit Function
+
+    modLibrary.DeletePinsForConnector wsLibPins, 2, modLibrary.LIB_ROW_CAP, sConnectorID
+    vPins = modLibrary.ReadPinsForConnector(wsScratch, SCRATCH_FIRST_ROW, SCRATCH_LAST_ROW, sConnectorID)
+    If Not IsEmpty(vPins) Then
+        Dim vRow(1 To 7) As Variant, j As Long
+        For i = LBound(vPins, 1) To UBound(vPins, 1)
+            For j = 1 To modLibrary.PIN_FIELD_COUNT
+                vRow(j) = vPins(i, j)
+            Next j
+            modLibrary.WritePin wsLibPins, 2, modLibrary.LIB_ROW_CAP, vRow
+        Next i
+    End If
+
+    SaveConnector = True
+End Function
