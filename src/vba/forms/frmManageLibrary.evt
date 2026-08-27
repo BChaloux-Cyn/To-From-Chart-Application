@@ -8,20 +8,19 @@ Private Sub UserForm_Initialize()
     RefreshList
 End Sub
 
+' QueryClose fires for every unload path - a button's Unload Me as well as
+' the form's own system Close (X) button - so this is the one place that
+' needs to close mLibrary. On Error Resume Next covers the button-click
+' paths, which unload the form after already reading what they need; by
+' the time QueryClose runs there is nothing left to close.
+Private Sub UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)
+    On Error Resume Next
+    mLibrary.Close SaveChanges:=False
+    On Error GoTo 0
+End Sub
+
 Private Sub RefreshList()
-    Dim ws As Worksheet, nLast As Long, r As Long, n As Long
-
-    lstConnectors.Clear
-    Set ws = mLibrary.Worksheets("Connectors")
-    nLast = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
-    If nLast < 2 Then Exit Sub
-
-    ReDim mConnectorIDs(1 To nLast - 1)
-    For r = 2 To nLast
-        n = n + 1
-        mConnectorIDs(n) = Trim$(CStr(ws.Cells(r, modLibrary.LIB_COL_ID).Value))
-        lstConnectors.AddItem mConnectorIDs(n) & " - " & CStr(ws.Cells(r, modLibrary.LIB_COL_NAME).Value)
-    Next r
+    mConnectorIDs = modConnectorUI.RefreshConnectorList(mLibrary.Worksheets("Connectors"), lstConnectors)
 End Sub
 
 Private Sub cmdEdit_Click()
@@ -42,7 +41,6 @@ Private Sub cmdEdit_Click()
     Load frmConnectorEditor
     frmConnectorEditor.LoadForEdit sConnectorID, vFields, mLibrary.Worksheets("Photos")
 
-    mLibrary.Close SaveChanges:=False
     Unload Me
     frmConnectorEditor.Show
 End Sub
@@ -64,6 +62,5 @@ Private Sub cmdDelete_Click()
 End Sub
 
 Private Sub cmdClose_Click()
-    mLibrary.Close SaveChanges:=False
     Unload Me
 End Sub

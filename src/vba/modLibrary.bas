@@ -309,3 +309,21 @@ Public Function CachePhotoPath(ByVal sWorkbookFolder As String, ByVal sConnector
 
     CachePhotoPath = sFolder & sConnectorID & ".png"
 End Function
+
+Public Function ExportShapeToFile(shp As Shape, ByVal sPath As String) As Boolean
+    ' Excel has no direct "export a Shape to an image file" call. Pasting it
+    ' into a throwaway ChartObject on the shape's own sheet and exporting
+    ' the chart is the standard workaround - and, unlike Worksheet.Paste,
+    ' Chart.Paste does not require the host sheet to be active, so this
+    ' works even when shp's parent sheet is very hidden (_Snapshot, _Edit).
+    Dim wsHost As Worksheet, cht As ChartObject
+
+    Set wsHost = shp.Parent
+    shp.Copy
+    Set cht = wsHost.ChartObjects.Add(0, 0, shp.Width, shp.Height)
+    cht.Chart.Paste
+    cht.Chart.Export sPath, "PNG"
+    cht.Delete
+
+    ExportShapeToFile = (Len(Dir$(sPath)) > 0)
+End Function

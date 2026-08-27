@@ -132,6 +132,7 @@ End Function
 Public Function RemoveConnectorInstance(ByVal sRefDes As String) As Boolean
     Dim ws As Worksheet, wsChart As Worksheet
     Dim r As Long, nLast As Long, c As Long
+    Dim bEvents As Boolean
 
     Set ws = ThisWorkbook.Worksheets(CONN_SHEET)
     nLast = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
@@ -145,6 +146,15 @@ Public Function RemoveConnectorInstance(ByVal sRefDes As String) As Boolean
         End If
     Next i
     If r = 0 Then Exit Function
+
+    ' The row-compaction write below touches column A of the Connectors
+    ' sheet, which shConnectors.evt watches for ref-des renames - without
+    ' suppressing events here, that handler sees the swapped-in RefDes as a
+    ' "rename" of the just-removed row, finds it collides with the row it
+    ' was copied from (not yet cleared), and reverts the write mid-removal.
+    bEvents = Application.EnableEvents
+    Application.EnableEvents = False
+    On Error GoTo CleanUp
 
     If r < nLast Then
         For c = 1 To 6
@@ -168,4 +178,7 @@ Public Function RemoveConnectorInstance(ByVal sRefDes As String) As Boolean
     Next i
 
     RemoveConnectorInstance = True
+
+CleanUp:
+    Application.EnableEvents = bEvents
 End Function
