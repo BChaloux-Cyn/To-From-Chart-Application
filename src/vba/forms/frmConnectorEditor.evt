@@ -1,0 +1,135 @@
+Option Explicit
+
+Private mMarkers As Collection
+Private mConnectorID As String
+Private mNextPinNumber As Long
+Private mPhotoPath As String
+
+Private Sub UserForm_Initialize()
+    Set mMarkers = New Collection
+    mNextPinNumber = 1
+    cboType.ListIndex = 0
+End Sub
+
+Private Sub cmdLoadPhoto_Click()
+    Dim sPath As String
+    sPath = Application.GetOpenFilename( _
+        "Pictures (*.png; *.jpg; *.jpeg; *.bmp), *.png;*.jpg;*.jpeg;*.bmp")
+    If sPath = "False" Then Exit Sub
+
+    Dim pic As IPictureDisp
+    Set pic = LoadPicture(sPath)
+    If pic Is Nothing Then Exit Sub
+
+    ' HIMETRIC-to-pixel conversion cancels out in a ratio - only the ratio
+    ' between Width and Height matters here.
+    Dim vFit As Variant
+    vFit = modPinEditor.FitAspectRatio(CDbl(pic.Width), CDbl(pic.Height), imgPhoto.Width, imgPhoto.Height)
+    If IsEmpty(vFit) Then Exit Sub
+
+    imgPhoto.PictureSizeMode = fmPictureSizeModeStretch
+    imgPhoto.Picture = pic
+    imgPhoto.Width = vFit(0)
+    imgPhoto.Height = vFit(1)
+
+    mPhotoPath = sPath
+    mConnectorID = modLibrary.SlugifyConnectorID(Trim$(txtPartNumber.Text), Trim$(txtName.Text))
+End Sub
+
+Private Sub imgPhoto_MouseUp(ByVal Button As Integer, ByVal Shift As Integer, _
+                             ByVal X As Single, ByVal Y As Single)
+    If tglPlacePins.Value <> True Then Exit Sub
+    If Len(mConnectorID) = 0 Then Exit Sub
+
+    Dim dNormX As Double, dNormY As Double
+    dNormX = X / imgPhoto.Width
+    dNormY = Y / imgPhoto.Height
+
+    Dim sLabel As String
+    sLabel = "Pin " & CStr(mNextPinNumber)
+
+    If modPinEditor.PlacePin(ThisWorkbook.Worksheets("_Edit"), mConnectorID, mNextPinNumber, _
+                             sLabel, dNormX, dNormY) Then
+        AddMarkerControl mNextPinNumber, X, Y
+        lstPins.AddItem sLabel
+        mNextPinNumber = mNextPinNumber + 1
+    End If
+End Sub
+
+Private Sub AddMarkerControl(ByVal nPinNumber As Long, ByVal sngX As Single, ByVal sngY As Single)
+    Dim lbl As MSForms.Label
+    Set lbl = Me.Controls.Add("Forms.Label.1", "lblMarker" & CStr(nPinNumber), True)
+    lbl.Caption = CStr(nPinNumber)
+    lbl.Left = imgPhoto.Left + sngX - (lbl.Width / 2)
+    lbl.Top = imgPhoto.Top + sngY - (lbl.Height / 2)
+    lbl.TextAlign = fmTextAlignCenter
+    lbl.BackStyle = fmBackStyleOpaque
+    lbl.BackColor = RGB(255, 255, 255)
+    lbl.BorderStyle = fmBorderStyleSingle
+
+    Dim marker As clsPinMarker
+    Set marker = New clsPinMarker
+    marker.PinNumber = nPinNumber
+    marker.ConnectorID = mConnectorID
+    Set marker.ScratchSheet = ThisWorkbook.Worksheets("_Edit")
+    Set marker.PhotoControl = imgPhoto
+    Set marker.LabelControl = lbl
+    mMarkers.Add marker, CStr(nPinNumber)
+End Sub
+
+Private Sub cmdDeletePin_Click()
+    If lstPins.ListIndex < 0 Then Exit Sub
+    Dim nPinNumber As Long
+    nPinNumber = lstPins.ListIndex + 1
+
+    modPinEditor.RemovePin ThisWorkbook.Worksheets("_Edit"), mConnectorID, nPinNumber
+    On Error Resume Next
+    Me.Controls.Remove "lblMarker" & CStr(nPinNumber)
+    mMarkers.Remove CStr(nPinNumber)
+    On Error GoTo 0
+    lstPins.RemoveItem lstPins.ListIndex
+End Sub
+
+Private Sub cmdClearPins_Click()
+    modPinEditor.ClearScratchPins ThisWorkbook.Worksheets("_Edit")
+
+    Dim marker As Variant
+    For Each marker In mMarkers
+        On Error Resume Next
+        Me.Controls.Remove marker.LabelControl.Name
+        On Error GoTo 0
+    Next marker
+    Set mMarkers = New Collection
+    lstPins.Clear
+    mNextPinNumber = 1
+End Sub
+
+Private Sub cmdSnapLabel_Click()
+    If lstPins.ListIndex < 0 Then Exit Sub
+    modPinEditor.SnapLabelToPin ThisWorkbook.Worksheets("_Edit"), mConnectorID, lstPins.ListIndex + 1
+End Sub
+
+Private Sub cmdSave_Click()
+    Dim lib As Workbook
+    Set lib = Workbooks.Open(ThisWorkbook.Path & "\ConnectorLibrary.xlsx")
+
+    Dim sNowUtc As String
+    sNowUtc = Format$(Now, "yyyy-mm-ddThh:mm:ssZ")
+
+    If modPinEditor.SaveConnector(lib.Worksheets("Connectors"), lib.Worksheets("Pins"), _
+            lib.Worksheets("Photos"), ThisWorkbook.Worksheets("_Edit"), mConnectorID, _
+            Trim$(txtName.Text), Trim$(txtManufacturer.Text), Trim$(txtPartNumber.Text), _
+            cboType.Text, CLng(Val(txtPinCount.Text)), Trim$(txtNotes.Text), mPhotoPath, _
+            sNowUtc, sNowUtc, "Local") Then
+        lib.Save
+        lib.Close SaveChanges:=False
+        Unload Me
+    Else
+        lib.Close SaveChanges:=False
+    End If
+End Sub
+
+Private Sub cmdCancel_Click()
+    modPinEditor.ClearScratchPins ThisWorkbook.Worksheets("_Edit")
+    Unload Me
+End Sub

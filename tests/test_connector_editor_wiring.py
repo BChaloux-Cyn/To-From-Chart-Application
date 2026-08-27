@@ -1,0 +1,47 @@
+import pytest
+
+VBEXT_CT_CLASSMODULE = 2
+
+
+def module_source(wb, component_name):
+    module = wb.VBProject.VBComponents(component_name).CodeModule
+    return module.Lines(1, module.CountOfLines)
+
+
+def test_pin_marker_class_exists(wb):
+    names = [wb.VBProject.VBComponents(i + 1).Name for i in range(wb.VBProject.VBComponents.Count)]
+    assert "clsPinMarker" in names
+
+
+def test_pin_marker_is_a_class_module(wb):
+    assert wb.VBProject.VBComponents("clsPinMarker").Type == VBEXT_CT_CLASSMODULE
+
+
+def test_pin_marker_handles_mouse_drag_events(wb):
+    source = module_source(wb, "clsPinMarker")
+    for handler in ("mLabel_MouseDown", "mLabel_MouseMove", "mLabel_MouseUp"):
+        assert handler in source
+
+
+def test_pin_marker_calls_move_marker_on_drop(wb):
+    assert "modPinEditor.MoveMarker" in module_source(wb, "clsPinMarker")
+
+
+@pytest.mark.parametrize(
+    "handler",
+    [
+        "cmdLoadPhoto_Click", "imgPhoto_MouseUp", "cmdDeletePin_Click",
+        "cmdClearPins_Click", "cmdSnapLabel_Click", "cmdSave_Click", "cmdCancel_Click",
+    ],
+)
+def test_form_wires_every_command(wb, handler):
+    assert handler in module_source(wb, "frmConnectorEditor")
+
+
+def test_form_calls_into_the_tested_logic_module_for_every_pin_action(wb):
+    source = module_source(wb, "frmConnectorEditor")
+    for call in (
+        "modPinEditor.PlacePin", "modPinEditor.RemovePin", "modPinEditor.ClearScratchPins",
+        "modPinEditor.SnapLabelToPin", "modPinEditor.SaveConnector", "modPinEditor.FitAspectRatio",
+    ):
+        assert call in source

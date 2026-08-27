@@ -20,13 +20,17 @@ LIBRARY_NAME = "ConnectorLibrary.xlsx"
 
 VBA_MODULES = [
     "modUtil.bas", "modState.bas", "modConnectors.bas", "modChart.bas",
-    "modLibrary.bas", "modPinEditor.bas",
+    "modLibrary.bas", "modPinEditor.bas", "clsPinMarker.cls",
 ]
 BUILD_VERSION = "0.1.0"
 
 SHEET_EVENTS = [
     ("shHarness", "shHarness.evt"),
     ("shConnectors", "shConnectors.evt"),
+]
+
+FORM_EVENTS = [
+    ("frmConnectorEditor", "frmConnectorEditor.evt"),
 ]
 
 
@@ -54,6 +58,9 @@ def build(out_dir: Path = DIST) -> Path:
                 source = (VBA_DIR / "sheets" / filename).read_text(encoding="utf-8")
                 excel_com.add_sheet_code(wb, codename, source)
             form_layout.build_connector_editor_form(wb, excel_com.add_userform)
+            for codename, filename in FORM_EVENTS:
+                source = (VBA_DIR / "forms" / filename).read_text(encoding="utf-8")
+                excel_com.add_sheet_code(wb, codename, source)
             excel_com.save_as_xlsm(wb, target)
         finally:
             wb.Close(SaveChanges=False)
