@@ -51,7 +51,8 @@ it now or accept the current documented behavior.
 
 ## 2c: Connector picker and snapshot
 
-Status: not yet implemented.
+Status: implemented (2026-08-27), commits `53c0116`..`c334ced`.
+**Outstanding - not yet run.**
 
 Per the sub-plan's own Task 9: Add Connector should list the library, add an
 instance, and populate `_Snapshot`. Manage Library's Edit should reopen the
@@ -64,6 +65,32 @@ references.
       connector's existing pins.
 - [ ] Manage Library > Delete prompts, then removes the entry.
 - [ ] Remove Connector prompts for a ref des and clears its chart references.
+- [ ] Renaming a ref des cell on the Connectors sheet rewrites every chart
+      row referencing it; renaming to an already-used ref des reverts the
+      cell instead of applying.
+
+**Extra attention - all NEW code beyond the original sub-plan, with no
+automated behavioral coverage (structural tests only, matching 2b's
+precedent):**
+
+- `frmConnectorEditor.LoadForEdit` and its helpers
+  (`LoadExistingPhoto`/`ExportShapeToFile`/`RebuildPinListFromScratch`) were
+  not in the original plan - added because `frmConnectorEditor` had no path
+  to populate itself from an existing connector at all. Specifically verify:
+  - [ ] All fields (Name, Manufacturer, Part Number, Type, Pin Count, Notes)
+        populate correctly on Edit.
+  - [ ] The existing photo displays correctly (this round-trips through a
+        temp-file export of the embedded Shape via a throwaway ChartObject -
+        `ExportShapeToFile` - which has no automated coverage at all).
+  - [ ] Existing pin markers appear at the correct positions on the photo.
+  - [ ] Saving an edited connector (with no new photo picked) succeeds and
+        the re-embedded photo in `ConnectorLibrary.xlsx` still looks correct
+        - this is the scenario `ExportShapeToFile` exists to support.
+  - [ ] Cancel after Edit does not corrupt the library entry.
+- `modConnectors.RenameRefDes` / `shConnectors.evt`'s
+  `Worksheet_SelectionChange`+`Worksheet_Change` caching: real mouse-driven
+  cell edits (as opposed to the test suite's `.Activate()`-then-`.Select()`
+  simulation) should be double-checked for the revert-on-collision path.
 
 ## 2d: Library import/export
 
@@ -97,6 +124,7 @@ If Task 1's automated test fails in a way that looks clipboard-related:
 ## Outcome (fill in once run)
 
 - 2b: _not yet run_
-- 2c: _not yet run_
+- 2c: _not yet run_ (implemented; includes edit-mode support beyond the
+  original sub-plan - see the "Extra attention" list above)
 - 2d: _not yet run_
 - Adjustments made as a result: _none yet_
