@@ -6,6 +6,7 @@ EXPECTED = [
     ("Connectors", "shConnectors", -1),
     ("Check", "shCheck", -1),
     ("_Snapshot", "shSnapshot", 2),
+    ("_Edit", "shEdit", 2),
     ("_Lists", "shLists", 2),
     ("_State", "shState", 2),
 ]

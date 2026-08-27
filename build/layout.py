@@ -11,6 +11,7 @@ SHEETS = [
     ("Connectors", "shConnectors", VISIBLE),
     ("Check", "shCheck", VISIBLE),
     ("_Snapshot", "shSnapshot", VERY_HIDDEN),
+    ("_Edit", "shEdit", VERY_HIDDEN),
     ("_Lists", "shLists", VERY_HIDDEN),
     ("_State", "shState", VERY_HIDDEN),
 ]
