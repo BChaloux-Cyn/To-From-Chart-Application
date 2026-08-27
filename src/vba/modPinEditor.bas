@@ -146,3 +146,23 @@ Public Function NeedsLeaderLine(wsScratch As Worksheet, ByVal sConnectorID As St
         CDbl(wsScratch.Cells(r, modLibrary.PIN_COL_LABELX).Value), _
         CDbl(wsScratch.Cells(r, modLibrary.PIN_COL_LABELY).Value))
 End Function
+
+Public Function FitAspectRatio(ByVal dSourceWidth As Double, ByVal dSourceHeight As Double, _
+                               ByVal dBoxWidth As Double, ByVal dBoxHeight As Double) As Variant
+    Dim dSourceRatio As Double, dBoxRatio As Double, dOutWidth As Double, dOutHeight As Double
+
+    If dSourceWidth <= 0 Or dSourceHeight <= 0 Or dBoxWidth <= 0 Or dBoxHeight <= 0 Then Exit Function
+
+    dSourceRatio = dSourceWidth / dSourceHeight
+    dBoxRatio = dBoxWidth / dBoxHeight
+
+    If dSourceRatio > dBoxRatio Then
+        dOutWidth = dBoxWidth
+        dOutHeight = dBoxWidth / dSourceRatio
+    Else
+        dOutHeight = dBoxHeight
+        dOutWidth = dBoxHeight * dSourceRatio
+    End If
+
+    FitAspectRatio = Array(dOutWidth, dOutHeight)
+End Function
