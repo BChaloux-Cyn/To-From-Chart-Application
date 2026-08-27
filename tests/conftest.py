@@ -10,6 +10,8 @@ import win32com.client as win32
 ROOT = Path(__file__).resolve().parents[1]
 ARTIFACT = ROOT / "dist" / "HarnessCreator.xlsm"
 
+sys.path.insert(0, str(ROOT / "build"))
+
 MSO_AUTOMATION_SECURITY_LOW = 1
 
 
