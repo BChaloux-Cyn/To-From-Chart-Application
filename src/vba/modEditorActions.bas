@@ -89,3 +89,40 @@ Public Function NextPinNumber(wsScratch As Worksheet, ByVal sConnectorID As Stri
 
     NextPinNumber = nMax + 1
 End Function
+
+' mConnectorID is derived from Name and Part Number when the photo loads
+' and never recomputed, so placing pins before both are filled in used to
+' do nothing at all, silently. The guard runs before the file picker opens.
+Public Function CanLoadPhoto(ByVal sName As String, ByVal sPartNumber As String) As Variant
+    If Len(Trim$(sName)) = 0 Or Len(Trim$(sPartNumber)) = 0 Then
+        CanLoadPhoto = modContract.Failure("MISSING_NAME_OR_PART")
+        Exit Function
+    End If
+    CanLoadPhoto = modContract.Success("OK")
+End Function
+
+' Where the editor's photo preview should read from, and whether a one-time
+' backfill from the embedded Shape is needed first. The on-disk cache is
+' preferred because re-exporting the Shape goes through the clipboard,
+' which is unreliable for VBA-triggered operations on this machine.
+Public Function PhotoSourceForEdit(ByVal sWorkbookPath As String, _
+                                   ByVal sConnectorID As String) As Variant
+    Dim sCachePath As String
+    sCachePath = modLibrary.CachePhotoPath(sWorkbookPath, sConnectorID, "jpg")
+
+    If Len(Dir$(sCachePath)) = 0 Then
+        PhotoSourceForEdit = modContract.Failure("NEEDS_BACKFILL", sCachePath)
+        Exit Function
+    End If
+
+    PhotoSourceForEdit = modContract.Success("CACHE_READY", sCachePath)
+End Function
+
+Public Function DeletePinRequest(wsScratch As Worksheet, ByVal sConnectorID As String, _
+                                 ByVal nPinNumber As Long) As Variant
+    If modPinEditor.RemovePin(wsScratch, sConnectorID, nPinNumber) Then
+        DeletePinRequest = modContract.Success("PIN_DELETED", nPinNumber)
+    Else
+        DeletePinRequest = modContract.Failure("PIN_NOT_FOUND", nPinNumber)
+    End If
+End Function

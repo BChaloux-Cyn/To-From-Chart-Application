@@ -87,3 +87,53 @@ def test_next_pin_number_is_one_past_the_highest(wb):
     write_scratch_pin(wb, ws, "J1", 1, "Pin 1", 0.1, 0.1, 0.1, 0.1)
     write_scratch_pin(wb, ws, "J1", 5, "Pin 5", 0.1, 0.1, 0.1, 0.1)
     assert run(wb, "modEditorActions.NextPinNumber", ws, "J1") == 6
+
+
+from tests.conftest import run_action
+
+
+@pytest.mark.parametrize("name,part,expected", [
+    ("DTM 4-way", "DTM06-4S", "OK"),
+    ("", "DTM06-4S", "MISSING_NAME_OR_PART"),
+    ("DTM 4-way", "", "MISSING_NAME_OR_PART"),
+    ("", "", "MISSING_NAME_OR_PART"),
+    ("   ", "DTM06-4S", "MISSING_NAME_OR_PART"),
+])
+def test_can_load_photo_requires_both_fields(wb, name, part, expected):
+    result = run_action(wb, "modEditorActions.CanLoadPhoto", name, part)
+    assert result.outcome == expected
+    assert result.ok is (expected == "OK")
+
+
+def test_photo_source_needs_backfill_when_no_cache_file_exists(wb, tmp_path):
+    result = run_action(wb, "modEditorActions.PhotoSourceForEdit", str(tmp_path), "DTM-04P")
+    assert result.outcome == "NEEDS_BACKFILL"
+    assert result.payload.endswith("Photos\\DTM-04P.jpg")
+
+
+def test_photo_source_is_cache_ready_once_the_file_exists(wb, tmp_path):
+    cache = run(wb, "modLibrary.CachePhotoPath", str(tmp_path), "DTM-04P", "jpg")
+    from pathlib import Path
+    Path(cache).write_bytes(b"not a real jpeg, but the file exists")
+
+    result = run_action(wb, "modEditorActions.PhotoSourceForEdit", str(tmp_path), "DTM-04P")
+    assert result.outcome == "CACHE_READY"
+    assert result.payload == cache
+
+
+def test_delete_pin_removes_it_from_the_scratch_sheet(wb):
+    ws = wb.Worksheets("_Edit")
+    run(wb, "modPinEditor.ClearScratchPins", ws)
+    write_scratch_pin(wb, ws, "J1", 1, "Pin 1", 0.1, 0.1, 0.1, 0.1)
+    write_scratch_pin(wb, ws, "J1", 2, "Pin 2", 0.2, 0.2, 0.2, 0.2)
+
+    result = run_action(wb, "modEditorActions.DeletePinRequest", ws, "J1", 2)
+    assert (result.ok, result.outcome, result.payload) == (True, "PIN_DELETED", 2)
+    assert [int(r[1]) for r in run(wb, "modEditorActions.PinListItems", ws, "J1")] == [1]
+
+
+def test_delete_pin_reports_a_missing_pin(wb):
+    ws = wb.Worksheets("_Edit")
+    run(wb, "modPinEditor.ClearScratchPins", ws)
+    result = run_action(wb, "modEditorActions.DeletePinRequest", ws, "J1", 9)
+    assert (result.ok, result.outcome, result.payload) == (False, "PIN_NOT_FOUND", 9)
