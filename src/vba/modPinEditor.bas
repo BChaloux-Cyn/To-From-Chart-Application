@@ -183,6 +183,31 @@ Public Function FitAspectRatio(ByVal dSourceWidth As Double, ByVal dSourceHeight
     FitAspectRatio = Array(dOutWidth, dOutHeight)
 End Function
 
+' The on-screen top-left for a marker badge whose centre sits on the
+' normalized point (dNormX, dNormY) within the photo control's box.
+' Exact inverse of NormFromMarker.
+Public Function MarkerTopLeft(ByVal dNormX As Double, ByVal dNormY As Double, _
+                              ByVal dPhotoLeft As Double, ByVal dPhotoTop As Double, _
+                              ByVal dPhotoW As Double, ByVal dPhotoH As Double, _
+                              ByVal dMarkerW As Double, ByVal dMarkerH As Double) As Variant
+    MarkerTopLeft = Array( _
+        dPhotoLeft + dNormX * dPhotoW - (dMarkerW / 2), _
+        dPhotoTop + dNormY * dPhotoH - (dMarkerH / 2))
+End Function
+
+' The normalized point under a marker badge's centre. Exact inverse of
+' MarkerTopLeft. Empty when the photo box has no area to normalize against.
+Public Function NormFromMarker(ByVal dLeft As Double, ByVal dTop As Double, _
+                               ByVal dMarkerW As Double, ByVal dMarkerH As Double, _
+                               ByVal dPhotoLeft As Double, ByVal dPhotoTop As Double, _
+                               ByVal dPhotoW As Double, ByVal dPhotoH As Double) As Variant
+    If dPhotoW <= 0 Or dPhotoH <= 0 Then Exit Function
+
+    NormFromMarker = Array( _
+        (dLeft + dMarkerW / 2 - dPhotoLeft) / dPhotoW, _
+        (dTop + dMarkerH / 2 - dPhotoTop) / dPhotoH)
+End Function
+
 Public Function SaveConnector(wsLibConn As Worksheet, wsLibPins As Worksheet, wsLibPhotos As Worksheet, _
                               wsScratch As Worksheet, ByVal sConnectorID As String, ByVal sName As String, _
                               ByVal sManufacturer As String, ByVal sPartNumber As String, ByVal sType As String, _
