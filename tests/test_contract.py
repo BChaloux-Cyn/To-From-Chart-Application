@@ -42,3 +42,20 @@ def test_every_declared_code_has_a_payload_kind(wb):
 def test_table_row_count_handles_empty_and_populated(wb):
     assert run(wb, "modContract.TableRowCount", None) == 0
     assert run(wb, "modContract.TableRowCount", ((1, 2), (3, 4))) == 2
+
+
+def test_run_action_validates_and_unpacks(wb):
+    from tests.conftest import run_action
+
+    result = run_action(wb, "modContract.Success", "PLACED", 3)
+    assert result.ok is True
+    assert result.outcome == "PLACED"
+    assert result.payload == 3
+
+
+def test_run_action_rejects_a_non_envelope_return(wb):
+    from tests.conftest import run_action
+
+    # PayloadKind is a query returning a bare string, not an envelope.
+    with pytest.raises(AssertionError):
+        run_action(wb, "modContract.PayloadKind", "SAVED")

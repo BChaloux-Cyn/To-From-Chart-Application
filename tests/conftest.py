@@ -54,6 +54,46 @@ def wb(app, artifact):
         book.Close(SaveChanges=False)
 
 
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Result:
+    """A layer 1 action's three-element envelope, unpacked."""
+
+    ok: bool
+    outcome: str
+    payload: object
+
+
+_known_outcomes: set[str] | None = None
+
+
+def known_outcomes(wb) -> set[str]:
+    """The outcome registry, read once from VBA so it cannot drift from a
+    Python mirror."""
+    global _known_outcomes
+    if _known_outcomes is None:
+        _known_outcomes = set(run(wb, "modContract.OutcomeCodes"))
+    return _known_outcomes
+
+
+def run_action(wb, macro: str, *args) -> Result:
+    """Call a layer 1 action and validate its envelope before returning it.
+
+    Queries return bare values and must use `run` instead.
+    """
+    raw = run(wb, macro, *args)
+    assert isinstance(raw, (tuple, list)) and len(raw) == 3, (
+        f"{macro} returned {raw!r}, not a three-element result"
+    )
+    ok, outcome, payload = raw
+    assert isinstance(ok, bool), f"{macro} returned a non-boolean ok: {ok!r}"
+    assert isinstance(outcome, str) and outcome, f"{macro} returned a blank outcome"
+    assert outcome in known_outcomes(wb), f"{macro} returned unregistered outcome {outcome!r}"
+    return Result(ok, outcome, payload)
+
+
 LIBRARY_ARTIFACT = ROOT / "dist" / "ConnectorLibrary.xlsx"
 
 
