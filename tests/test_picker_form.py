@@ -21,9 +21,11 @@ def test_manage_library_has_its_controls(wb, name):
 
 
 def test_picker_add_calls_add_connector_instance_and_snapshot(wb):
+    # modPickerActions.AddFromLibrary (Task 11) is the one place that calls
+    # AddConnectorInstance and SnapshotConnector - the picker delegates to it
+    # rather than calling those layer 0 primitives directly.
     source = module_source(wb, "frmConnectorPicker")
-    assert "modConnectors.AddConnectorInstance" in source
-    assert "modSnapshot.SnapshotConnector" in source
+    assert "modPickerActions.AddFromLibrary" in source
 
 
 def test_picker_new_launches_the_connector_editor(wb):
@@ -39,8 +41,7 @@ def test_picker_new_chains_into_adding_an_instance_of_what_was_just_saved(wb):
     new_click = source[source.index("Private Sub cmdNew_Click"):]
     body = new_click.split("End Sub", 1)[0]
     assert "modConnectorUI.LastSavedConnectorID = \"\"" in body
-    assert "modConnectors.AddConnectorInstance" in body
-    assert "modSnapshot.SnapshotConnector" in body
+    assert "modPickerActions.AddFromLibrary" in body
     # Show must come before reading LastSavedConnectorID - it's only set
     # once frmConnectorEditor's Save actually runs.
     assert body.index("frmConnectorEditor.Show") < body.index("modConnectorUI.LastSavedConnectorID")
