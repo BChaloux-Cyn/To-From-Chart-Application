@@ -7,44 +7,33 @@ Option Explicit
 Private Const PHOTO_BOX_WIDTH As Double = 180
 Private Const PHOTO_BOX_HEIGHT As Double = 180
 
-' Pin marker badge size - the Label control's default size is sized for
+' Pin marker badge size - the Label control's default is sized for
 ' body text, not a small numbered dot on a photo.
 Private Const PIN_MARKER_SIZE As Double = 16
 
 Private mMarkers As Collection
-Private mListPinNumbers As Collection ' mirrors lstPins - item i+1 is the PinNumber shown at lstPins index i, since list position and PinNumber diverge once anything is deleted
 Private mConnectorID As String
-Private mOriginalConnectorID As String ' "" for a new connector; set by LoadForEdit so Save's uniqueness check can tell "still the connector I opened" from "collides with a different one"
-Private mNextPinNumber As Long
+Private mOriginalConnectorID As String ' "" for a new connector
 Private mPhotoPath As String
 
 Private Sub UserForm_Initialize()
     Set mMarkers = New Collection
-    Set mListPinNumbers = New Collection
-    mNextPinNumber = 1
 
-    ' Populated here (ThisWorkbook-qualified), not via RowSource: an
-    ' unqualified RowSource string ("_Lists!D2:D5") resolves against
-    ' whichever workbook is ActiveWorkbook when the control binds, not
-    ' necessarily this one. frmManageLibrary's Edit flow has
-    ' ConnectorLibrary.xlsx active by the time this form loads, which left
-    ' the Type dropdown with no options at all.
-    Dim wsLists As Worksheet, r As Long
-    Set wsLists = ThisWorkbook.Worksheets("_Lists")
-    r = 2
-    Do While Len(Trim$(CStr(wsLists.Cells(r, 4).Value))) > 0
-        cboType.AddItem wsLists.Cells(r, 4).Value
-        r = r + 1
-    Loop
+    Dim vTypes As Variant, i As Long
+    vTypes = modEditorActions.TypeListItems(ThisWorkbook.Worksheets("_Lists"))
+    If Not IsEmpty(vTypes) Then
+        For i = LBound(vTypes) To UBound(vTypes)
+            cboType.AddItem vTypes(i)
+        Next i
+    End If
     If cboType.ListCount > 0 Then cboType.ListIndex = 0
 End Sub
 
 ' Called (after Load, before Show) by frmManageLibrary's cmdEdit_Click,
-' which has already seeded _Edit's scratch pins via modPinEditor.
-' LoadScratchPins - this only has to populate the visible fields and
-' rebuild the on-screen pin markers from that scratch data. vFields is the
-' 1-based Dim vResult(1 To 11) array modLibrary.ReadConnector returns.
-Public Sub LoadForEdit(ByVal sConnectorID As String, ByVal vFields As Variant, wsLibPhotos As Worksheet)
+' which has already seeded _Edit's scratch pins. vFields is the 1-based
+' array modLibrary.ReadConnector returns to an in-process caller.
+Public Sub LoadForEdit(ByVal sConnectorID As String, ByVal vFields As Variant, _
+                       wsLibPhotos As Worksheet)
     mConnectorID = sConnectorID
     mOriginalConnectorID = sConnectorID
 
@@ -56,99 +45,41 @@ Public Sub LoadForEdit(ByVal sConnectorID As String, ByVal vFields As Variant, w
     txtNotes.Text = CStr(vFields(7))
 
     LoadExistingPhoto sConnectorID, wsLibPhotos
-    RebuildPinListFromScratch
+    RebuildPinList
 End Sub
 
-' The embedded library Shape stays the source of truth for the harness
-' chart (EmbedConnectorPhoto/modSnapshot), but re-deriving a preview from
-' it here would mean re-exporting via Shape.Copy/Chart.Paste, which is
-' unreliable for VBA-triggered clipboard operations on this machine
-' (manual verification, phase-2-manual-verification.md, 2b/2c). Instead,
-' cmdSave_Click keeps a plain on-disk cache of the original photo file
-' (CachePhotoPath) alongside the library, purely via FileCopy - no
-' clipboard involved - and this reads straight from that cache.
 Private Sub LoadExistingPhoto(ByVal sConnectorID As String, wsLibPhotos As Worksheet)
-    Dim sCachePath As String
-    sCachePath = modLibrary.CachePhotoPath(ThisWorkbook.Path, sConnectorID, "jpg")
+    Dim vResult As Variant, sCachePath As String
+    vResult = modEditorActions.PhotoSourceForEdit(ThisWorkbook.Path, sConnectorID)
+    sCachePath = CStr(modContract.Payload(vResult))
 
-    If Len(Dir$(sCachePath)) = 0 Then
-        ' No cache yet - predates this fix, or an earlier save's cache
-        ' write never happened (e.g. edited without ever picking a photo).
-        ' One-time backfill attempt from the embedded Shape: same
-        ' reliability caveat ExportShapeToFile always had (not guaranteed
-        ' to work - see manual verification, phase-2-manual-verification.md,
-        ' 2b/2c), but gives this connector a chance to get a cache going
-        ' forward instead of never having one.
+    If Not modContract.Ok(vResult) Then
+        ' No cache yet. One-time backfill attempt from the embedded Shape:
+        ' the clipboard route is unreliable here, but it gives an older
+        ' connector a chance to get a cache going forward.
         Dim shp As Shape
         On Error Resume Next
         Set shp = wsLibPhotos.Shapes("PHOTO_" & sConnectorID)
         On Error GoTo 0
-        If Not shp Is Nothing Then modLibrary.ExportShapeToFile shp, sCachePath, "JPG"
-    End If
-    If Len(Dir$(sCachePath)) = 0 Then Exit Sub
-
-    Dim pic As IPictureDisp
-    Set pic = LoadPicture(sCachePath)
-    If pic Is Nothing Then Exit Sub
-
-    Dim vFit As Variant
-    vFit = modPinEditor.FitAspectRatio(CDbl(pic.Width), CDbl(pic.Height), PHOTO_BOX_WIDTH, PHOTO_BOX_HEIGHT)
-    If IsEmpty(vFit) Then Exit Sub
-
-    imgPhoto.PictureSizeMode = fmPictureSizeModeStretch
-    imgPhoto.Picture = pic
-    imgPhoto.Width = vFit(0)
-    imgPhoto.Height = vFit(1)
-
-    mPhotoPath = sCachePath
-End Sub
-
-Private Sub RebuildPinListFromScratch()
-    Dim vPins As Variant, i As Long, nPinNumber As Long
-    Dim dLabelX As Double, dLabelY As Double
-
-    vPins = modLibrary.ReadPinsForConnector(ThisWorkbook.Worksheets("_Edit"), _
-        modPinEditor.SCRATCH_FIRST_ROW, modPinEditor.SCRATCH_LAST_ROW, mConnectorID)
-    If IsEmpty(vPins) Then Exit Sub
-
-    For i = LBound(vPins, 1) To UBound(vPins, 1)
-        nPinNumber = CLng(vPins(i, 2))
-        lstPins.AddItem "Pin " & CStr(nPinNumber)
-        mListPinNumbers.Add nPinNumber
-        dLabelX = CDbl(vPins(i, 6))
-        dLabelY = CDbl(vPins(i, 7))
-        AddMarkerControl nPinNumber, dLabelX * imgPhoto.Width, dLabelY * imgPhoto.Height
-        If nPinNumber >= mNextPinNumber Then mNextPinNumber = nPinNumber + 1
-    Next i
-End Sub
-
-Private Sub cmdLoadPhoto_Click()
-    ' mConnectorID (below) is computed from Name/Part Number at the moment
-    ' the photo loads and never recomputed - placing pins before both are
-    ' filled in silently does nothing (mConnectorID is blank). Requiring
-    ' both first, rather than letting the photo load and pin placement fail
-    ' silently, is the fix flagged in phase-2-manual-verification.md.
-    If Len(Trim$(txtName.Text)) = 0 Or Len(Trim$(txtPartNumber.Text)) = 0 Then
-        MsgBox "Enter Name and Part Number before loading a photo.", vbExclamation
-        Exit Sub
+        If Not shp Is Nothing Then modLibraryShim_ExportShape shp, sCachePath
+        If Len(Dir$(sCachePath)) = 0 Then Exit Sub
     End If
 
-    ' Restricted to JPG: LoadPicture's legacy OLE picture loader unreliably
-    ' rejects valid PNGs (error 481) on some Windows/Office configurations.
-    ' JPG loads reliably, so the file picker only offers formats LoadPicture
-    ' actually handles here rather than routing through a workaround.
-    Dim sPath As String
-    sPath = Application.GetOpenFilename( _
-        "Pictures (*.jpg; *.jpeg), *.jpg;*.jpeg")
-    If sPath = "False" Then Exit Sub
+    ShowPhoto sCachePath
+End Sub
 
-    Dim pic As IPictureDisp
+' The one place this form still reaches a layer 0 routine, isolated so the
+' layering lint can allow it by name: Shape export needs a live Shape
+' object, which cannot cross Application.Run usefully.
+Private Sub modLibraryShim_ExportShape(shp As Shape, ByVal sPath As String)
+    modLibrary.ExportShapeToFile shp, sPath, "JPG"
+End Sub
+
+Private Sub ShowPhoto(ByVal sPath As String)
+    Dim pic As IPictureDisp, vFit As Variant
     Set pic = LoadPicture(sPath)
     If pic Is Nothing Then Exit Sub
 
-    ' HIMETRIC-to-pixel conversion cancels out in a ratio - only the ratio
-    ' between Width and Height matters here.
-    Dim vFit As Variant
     vFit = modPinEditor.FitAspectRatio(CDbl(pic.Width), CDbl(pic.Height), PHOTO_BOX_WIDTH, PHOTO_BOX_HEIGHT)
     If IsEmpty(vFit) Then Exit Sub
 
@@ -156,93 +87,107 @@ Private Sub cmdLoadPhoto_Click()
     imgPhoto.Picture = pic
     imgPhoto.Width = vFit(0)
     imgPhoto.Height = vFit(1)
-
     mPhotoPath = sPath
-    mConnectorID = modLibrary.SlugifyConnectorID(Trim$(txtPartNumber.Text), Trim$(txtName.Text))
+End Sub
+
+' The list box and the on-screen markers are both rebuilt from the scratch
+' sheet, which is the only place a pin exists. No parallel collection.
+Private Sub RebuildPinList()
+    Dim vItems As Variant, i As Long
+
+    lstPins.Clear
+    ClearMarkerControls
+
+    vItems = modEditorActions.PinListItems(ThisWorkbook.Worksheets("_Edit"), mConnectorID)
+    If IsEmpty(vItems) Then Exit Sub
+
+    For i = LBound(vItems, 1) To UBound(vItems, 1)
+        lstPins.AddItem CStr(vItems(i, 1))
+        AddMarkerControl CLng(vItems(i, 2)), CDbl(vItems(i, 3)), CDbl(vItems(i, 4))
+    Next i
+End Sub
+
+Private Function SelectedPinNumber() As Long
+    Dim vItems As Variant
+    If lstPins.ListIndex < 0 Then Exit Function
+
+    vItems = modEditorActions.PinListItems(ThisWorkbook.Worksheets("_Edit"), mConnectorID)
+    If IsEmpty(vItems) Then Exit Function
+    If lstPins.ListIndex + 1 > modContract.TableRowCount(vItems) Then Exit Function
+
+    SelectedPinNumber = CLng(vItems(LBound(vItems, 1) + lstPins.ListIndex, 2))
+End Function
+
+Private Sub cmdLoadPhoto_Click()
+    Dim sName As String, sPart As String, vResult As Variant
+    sName = Trim$(txtName.Text)
+    sPart = Trim$(txtPartNumber.Text)
+
+    vResult = modEditorActions.CanLoadPhoto(sName, sPart)
+    If Not modContract.Ok(vResult) Then
+        MsgBox modMessages.MessageFor(vResult), modMessages.MessageStyleFor(vResult)
+        Exit Sub
+    End If
+
+    Dim sPath As String
+    sPath = Application.GetOpenFilename(modEditorActions.PhotoFileFilter())
+    If sPath = "False" Then Exit Sub
+
+    ShowPhoto sPath
+    mConnectorID = modLibrary.SlugifyConnectorID(sPart, sName)
 End Sub
 
 Private Sub imgPhoto_MouseUp(ByVal Button As Integer, ByVal Shift As Integer, _
                              ByVal X As Single, ByVal Y As Single)
-    If Len(mConnectorID) = 0 Then Exit Sub
-
     Dim dNormX As Double, dNormY As Double
+    Dim bPlaceMode As Boolean, nSelected As Long, sPinCountText As String
+    Dim vResult As Variant
+
+    If imgPhoto.Width <= 0 Or imgPhoto.Height <= 0 Then Exit Sub
+
+    ' Capture every control value before the action call.
     dNormX = X / imgPhoto.Width
     dNormY = Y / imgPhoto.Height
+    bPlaceMode = (tglPlacePins.Value = True)
+    nSelected = SelectedPinNumber()
+    sPinCountText = txtPinCount.Text
 
-    If tglPlacePins.Value = True Then
-        Dim nPinCount As Long
-        If Not IsNumeric(txtPinCount.Text) Or CLng(Val(txtPinCount.Text)) <= 0 Then
-            MsgBox "Enter a valid Pin Count before placing pins.", vbExclamation
-            Exit Sub
-        End If
-        nPinCount = CLng(Val(txtPinCount.Text))
-        If lstPins.ListCount >= nPinCount Then
-            MsgBox "All " & CStr(nPinCount) & " pins have been placed.", vbExclamation
-            Exit Sub
-        End If
+    vResult = modEditorActions.PhotoClickAction(ThisWorkbook.Worksheets("_Edit"), _
+        mConnectorID, bPlaceMode, nSelected, sPinCountText, dNormX, dNormY)
 
-        Dim sLabel As String
-        sLabel = "Pin " & CStr(mNextPinNumber)
-
-        If modPinEditor.PlacePin(ThisWorkbook.Worksheets("_Edit"), mConnectorID, mNextPinNumber, _
-                                 sLabel, dNormX, dNormY) Then
-            AddMarkerControl mNextPinNumber, X, Y
-            lstPins.AddItem sLabel
-            mListPinNumbers.Add mNextPinNumber
-            mNextPinNumber = mNextPinNumber + 1
-        End If
-    ElseIf lstPins.ListIndex >= 0 Then
-        ' A pin is selected and Place Pins is off - clicking the image moves
-        ' that pin's anchor. The marker travels with it only if it was still
-        ' sitting on the anchor (modPinEditor.MoveAnchor decides that); either
-        ' way, reposition the on-screen marker to match its new label position.
-        Dim nPinNumber As Long
-        nPinNumber = mListPinNumbers(lstPins.ListIndex + 1)
-        If modPinEditor.MoveAnchor(ThisWorkbook.Worksheets("_Edit"), mConnectorID, nPinNumber, dNormX, dNormY) Then
-            RepositionMarkerControl nPinNumber
-        End If
-    End If
+    Select Case modContract.Outcome(vResult)
+        Case "PLACED"
+            RebuildPinList
+        Case "MOVED_ANCHOR"
+            RebuildPinList
+        Case "NO_OP"
+            ' Nothing to say: no connector yet, or nothing selected.
+        Case Else
+            MsgBox modMessages.MessageFor(vResult), modMessages.MessageStyleFor(vResult)
+    End Select
 End Sub
 
-Private Sub RepositionMarkerControl(ByVal nPinNumber As Long)
-    Dim marker As clsPinMarker
-    On Error Resume Next
-    Set marker = mMarkers(CStr(nPinNumber))
-    On Error GoTo 0
-    If marker Is Nothing Then Exit Sub
+Private Sub AddMarkerControl(ByVal nPinNumber As Long, ByVal dNormX As Double, _
+                             ByVal dNormY As Double)
+    Dim lbl As MSForms.Label, vPos As Variant
 
-    Dim vPins As Variant, i As Long, dLabelX As Double, dLabelY As Double
-    vPins = modLibrary.ReadPinsForConnector(ThisWorkbook.Worksheets("_Edit"), _
-        modPinEditor.SCRATCH_FIRST_ROW, modPinEditor.SCRATCH_LAST_ROW, mConnectorID)
-    If IsEmpty(vPins) Then Exit Sub
-
-    For i = LBound(vPins, 1) To UBound(vPins, 1)
-        If CLng(vPins(i, 2)) = nPinNumber Then
-            dLabelX = CDbl(vPins(i, 6))
-            dLabelY = CDbl(vPins(i, 7))
-            Exit For
-        End If
-    Next i
-
-    Dim lbl As MSForms.Label
-    Set lbl = marker.LabelControl
-    lbl.Left = imgPhoto.Left + dLabelX * imgPhoto.Width - (lbl.Width / 2)
-    lbl.Top = imgPhoto.Top + dLabelY * imgPhoto.Height - (lbl.Height / 2)
-End Sub
-
-Private Sub AddMarkerControl(ByVal nPinNumber As Long, ByVal sngX As Single, ByVal sngY As Single)
-    Dim lbl As MSForms.Label
-    Set lbl = Me.Controls.Add("Forms.Label.1", "lblMarker" & CStr(nPinNumber), True)
+    Set lbl = Me.Controls.Add("Forms.Label.1", _
+        modEditorActions.MarkerControlName(nPinNumber), True)
     lbl.Caption = CStr(nPinNumber)
     lbl.Width = PIN_MARKER_SIZE
     lbl.Height = PIN_MARKER_SIZE
     lbl.Font.Size = 8
-    lbl.Left = imgPhoto.Left + sngX - (lbl.Width / 2)
-    lbl.Top = imgPhoto.Top + sngY - (lbl.Height / 2)
     lbl.TextAlign = fmTextAlignCenter
     lbl.BackStyle = fmBackStyleOpaque
     lbl.BackColor = RGB(255, 255, 255)
     lbl.BorderStyle = fmBorderStyleSingle
+
+    vPos = modPinEditor.MarkerTopLeft(dNormX, dNormY, _
+        CDbl(imgPhoto.Left), CDbl(imgPhoto.Top), _
+        CDbl(imgPhoto.Width), CDbl(imgPhoto.Height), _
+        CDbl(lbl.Width), CDbl(lbl.Height))
+    lbl.Left = vPos(0)
+    lbl.Top = vPos(1)
 
     Dim marker As clsPinMarker
     Set marker = New clsPinMarker
@@ -254,23 +199,7 @@ Private Sub AddMarkerControl(ByVal nPinNumber As Long, ByVal sngX As Single, ByV
     mMarkers.Add marker, CStr(nPinNumber)
 End Sub
 
-Private Sub cmdDeletePin_Click()
-    If lstPins.ListIndex < 0 Then Exit Sub
-    Dim nPinNumber As Long
-    nPinNumber = mListPinNumbers(lstPins.ListIndex + 1)
-
-    modPinEditor.RemovePin ThisWorkbook.Worksheets("_Edit"), mConnectorID, nPinNumber
-    On Error Resume Next
-    Me.Controls.Remove "lblMarker" & CStr(nPinNumber)
-    mMarkers.Remove CStr(nPinNumber)
-    On Error GoTo 0
-    mListPinNumbers.Remove lstPins.ListIndex + 1
-    lstPins.RemoveItem lstPins.ListIndex
-End Sub
-
-Private Sub cmdClearPins_Click()
-    modPinEditor.ClearScratchPins ThisWorkbook.Worksheets("_Edit")
-
+Private Sub ClearMarkerControls()
     Dim marker As Variant
     For Each marker In mMarkers
         On Error Resume Next
@@ -278,66 +207,70 @@ Private Sub cmdClearPins_Click()
         On Error GoTo 0
     Next marker
     Set mMarkers = New Collection
-    Set mListPinNumbers = New Collection
-    lstPins.Clear
-    mNextPinNumber = 1
+End Sub
+
+Private Sub cmdDeletePin_Click()
+    Dim nPinNumber As Long
+    nPinNumber = SelectedPinNumber()
+    If nPinNumber = 0 Then Exit Sub
+
+    modEditorActions.DeletePinRequest ThisWorkbook.Worksheets("_Edit"), mConnectorID, nPinNumber
+    RebuildPinList
+End Sub
+
+Private Sub cmdClearPins_Click()
+    modPinEditor.ClearScratchPins ThisWorkbook.Worksheets("_Edit")
+    RebuildPinList
 End Sub
 
 Private Sub cmdSnapLabel_Click()
-    If lstPins.ListIndex < 0 Then Exit Sub
     Dim nPinNumber As Long
-    nPinNumber = mListPinNumbers(lstPins.ListIndex + 1)
+    nPinNumber = SelectedPinNumber()
+    If nPinNumber = 0 Then Exit Sub
+
     If modPinEditor.SnapLabelToPin(ThisWorkbook.Worksheets("_Edit"), mConnectorID, nPinNumber) Then
-        RepositionMarkerControl nPinNumber
+        RebuildPinList
     End If
 End Sub
 
 Private Sub cmdSave_Click()
+    Dim sID As String, sOriginal As String, sPhoto As String
+    Dim vFields As Variant, vResult As Variant
+
+    ' Capture every control value and form variable before the action call.
+    sID = mConnectorID
+    sOriginal = mOriginalConnectorID
+    sPhoto = mPhotoPath
+    vFields = Array(Trim$(txtName.Text), Trim$(txtManufacturer.Text), _
+                    Trim$(txtPartNumber.Text), cboType.Text, _
+                    txtPinCount.Text, Trim$(txtNotes.Text))
+
     Dim lib As Workbook
     Set lib = Workbooks.Open(ThisWorkbook.Path & "\ConnectorLibrary.xlsx")
 
-    ' A collision only matters when the row it would overwrite belongs to a
-    ' DIFFERENT connector than the one this session opened for editing -
-    ' re-saving the connector you're editing, unchanged, must not flag itself.
-    If modLibrary.FindConnectorRow(lib.Worksheets("Connectors"), 2, modLibrary.LIB_ROW_CAP, mConnectorID) > 0 _
-            And StrComp(mConnectorID, mOriginalConnectorID, vbTextCompare) <> 0 Then
-        MsgBox "Part Number already exists in the library (" & mConnectorID & "). Choose a different Part Number.", vbExclamation
-        lib.Close SaveChanges:=False
+    vResult = modEditorActions.SaveFromEditor( _
+        lib.Worksheets("Connectors"), lib.Worksheets("Pins"), lib.Worksheets("Photos"), _
+        ThisWorkbook.Worksheets("_Edit"), sID, sOriginal, vFields, sPhoto, _
+        Format$(Now, "yyyy-mm-ddThh:mm:ssZ"))
+
+    If modContract.Ok(vResult) Then lib.Save
+    lib.Close SaveChanges:=False
+
+    If Not modContract.Ok(vResult) Then
+        MsgBox modMessages.MessageFor(vResult), modMessages.MessageStyleFor(vResult)
         Exit Sub
     End If
 
-    Dim sNowUtc As String
-    sNowUtc = Format$(Now, "yyyy-mm-ddThh:mm:ssZ")
+    Dim sCopyTo As String
+    sCopyTo = modEditorActions.PhotoCacheRefreshTarget(ThisWorkbook.Path, sID, sPhoto)
+    If Len(sCopyTo) > 0 Then FileCopy sPhoto, sCopyTo
 
-    If modPinEditor.SaveConnector(lib.Worksheets("Connectors"), lib.Worksheets("Pins"), _
-            lib.Worksheets("Photos"), ThisWorkbook.Worksheets("_Edit"), mConnectorID, _
-            Trim$(txtName.Text), Trim$(txtManufacturer.Text), Trim$(txtPartNumber.Text), _
-            cboType.Text, CLng(Val(txtPinCount.Text)), Trim$(txtNotes.Text), mPhotoPath, _
-            sNowUtc, sNowUtc, "Local") Then
-        lib.Save
-        lib.Close SaveChanges:=False
-
-        ' Refresh the on-disk preview cache LoadExistingPhoto reads from -
-        ' a plain file copy, no clipboard involved (see LoadExistingPhoto).
-        ' Skipped when mPhotoPath already *is* the cache file (editing
-        ' without picking a new photo): FileCopy onto itself errors.
-        Dim sCachePath As String
-        sCachePath = modLibrary.CachePhotoPath(ThisWorkbook.Path, mConnectorID, "jpg")
-        If Len(mPhotoPath) > 0 And StrComp(mPhotoPath, sCachePath, vbTextCompare) <> 0 Then
-            FileCopy mPhotoPath, sCachePath
-        End If
-
-        ' A standard module's variable, not a property on this form: this
-        ' form unloads itself right below, and re-reading a property off a
-        ' just-unloaded predeclared instance risks silently re-triggering
-        ' UserForm_Initialize (which would reset it) rather than returning
-        ' the value just set - a real risk given this session's experience
-        ' with this form's Load/Show/Unload lifecycle being surprising.
-        modConnectorUI.LastSavedConnectorID = mConnectorID
-        Unload Me
-    Else
-        lib.Close SaveChanges:=False
-    End If
+    ' A standard module's variable, not a property on this form: this form
+    ' unloads itself right below, and re-reading a property off a
+    ' just-unloaded predeclared instance risks re-triggering
+    ' UserForm_Initialize instead of returning the value just set.
+    modConnectorUI.LastSavedConnectorID = sID
+    Unload Me
 End Sub
 
 Private Sub cmdCancel_Click()

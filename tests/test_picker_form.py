@@ -50,7 +50,11 @@ def test_connector_editor_save_records_the_saved_id_for_callers(wb):
     source = module_source(wb, "frmConnectorEditor")
     save_click = source[source.index("Private Sub cmdSave_Click"):]
     body = save_click.split("End Sub", 1)[0]
-    assert "modConnectorUI.LastSavedConnectorID = mConnectorID" in body
+    # sID is mConnectorID captured into a local before the save action call,
+    # per the layer 1/adapter split (Task 10): every control value and form
+    # variable is read before the call, so nothing after Unload Me needs to
+    # re-read form state.
+    assert "modConnectorUI.LastSavedConnectorID = sID" in body
 
 
 def test_manage_library_edit_launches_the_connector_editor(wb):
@@ -84,7 +88,10 @@ def test_manage_library_edit_shows_the_editor_before_unloading_itself(wb):
 def test_connector_editor_supports_loading_an_existing_connector(wb):
     source = module_source(wb, "frmConnectorEditor")
     assert "Public Sub LoadForEdit" in source
-    assert "RebuildPinListFromScratch" in source
+    # RebuildPinList (Task 10) is the sole rebuild path - list box and
+    # markers are both derived from the scratch sheet, not a parallel
+    # in-memory collection.
+    assert "RebuildPinList" in source
 
 
 def test_manage_library_delete_calls_library_delete_functions(wb):

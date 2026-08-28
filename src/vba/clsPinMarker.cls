@@ -48,9 +48,12 @@ Private Sub mLabel_MouseUp(ByVal Button As Integer, ByVal Shift As Integer, _
     If Not mDragging Then Exit Sub
     mDragging = False
 
-    Dim dNormX As Double, dNormY As Double
-    dNormX = (mLabel.Left + mLabel.Width / 2 - PhotoControl.Left) / PhotoControl.Width
-    dNormY = (mLabel.Top + mLabel.Height / 2 - PhotoControl.Top) / PhotoControl.Height
+    Dim vNorm As Variant
+    vNorm = modPinEditor.NormFromMarker( _
+        CDbl(mLabel.Left), CDbl(mLabel.Top), CDbl(mLabel.Width), CDbl(mLabel.Height), _
+        CDbl(PhotoControl.Left), CDbl(PhotoControl.Top), _
+        CDbl(PhotoControl.Width), CDbl(PhotoControl.Height))
+    If IsEmpty(vNorm) Then Exit Sub
 
-    modPinEditor.MoveMarker ScratchSheet, ConnectorID, PinNumber, dNormX, dNormY
+    modPinEditor.MoveMarker ScratchSheet, ConnectorID, PinNumber, vNorm(0), vNorm(1)
 End Sub
