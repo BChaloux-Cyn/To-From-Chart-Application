@@ -23,6 +23,7 @@ VBA_MODULES = [
     "modLibrary.bas", "modPinEditor.bas", "clsPinMarker.cls", "modSnapshot.bas",
     "modConnectorUI.bas", "modLibraryTransfer.bas", "modContract.bas",
     "modMessages.bas", "modEditorActions.bas", "modPickerActions.bas",
+    "modManageActions.bas",
 ]
 BUILD_VERSION = "0.1.0"
 
