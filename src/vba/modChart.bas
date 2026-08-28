@@ -15,6 +15,10 @@ Public Const COL_NOTES As Long = 11
 
 Private Const MAX_FORMULA1 As Long = 255
 
+' Above this threshold an edit is a bulk clear or paste, with no per-cell
+' edit worth reacting to.
+Public Const BULK_EDIT_THRESHOLD As Long = 500
+
 ' Module-level Const/Dim must sit in the declarations section, before any
 ' Sub/Function: VBA does not recognize one declared between procedures.
 Private Const TB_CLEAR_NAMES As String = _
@@ -143,3 +147,49 @@ Public Sub NewHarness()
 CleanUp:
     Application.EnableEvents = bEvents
 End Sub
+
+' Everything shHarness's Worksheet_Change decides. A bulk clear or paste
+' has no per-cell edit worth reacting to, but the pin dropdowns for the
+' affected rows are still stale and must be rebuilt - without clearing pin
+' values the same paste may have just set.
+Public Function ApplyHarnessEdit(wsHarness As Worksheet, rTarget As Range) As Variant
+    Dim cel As Range, nFirst As Long, nLast As Long, r As Long, n As Long
+
+    If rTarget.Cells.Count > BULK_EDIT_THRESHOLD Then
+        nFirst = rTarget.Row
+        If nFirst < CHART_FIRST_ROW Then nFirst = CHART_FIRST_ROW
+        nLast = rTarget.Row + rTarget.Rows.Count - 1
+        If nLast > CHART_LAST_ROW Then nLast = CHART_LAST_ROW
+
+        For r = nFirst To nLast
+            RebuildPinValidation r, COL_FROM_CONN, False
+            RebuildPinValidation r, COL_TO_CONN, False
+            n = n + 1
+        Next r
+        modState.MarkDirty
+        ApplyHarnessEdit = modContract.Success("BULK_REBUILT", n)
+        Exit Function
+    End If
+
+    For Each cel In rTarget.Cells
+        If cel.Row >= CHART_FIRST_ROW And cel.Row <= CHART_LAST_ROW Then
+            If cel.Column = COL_FROM_CONN Or cel.Column = COL_TO_CONN Then
+                RebuildPinValidation cel.Row, cel.Column
+                n = n + 1
+            End If
+            modState.MarkDirty
+        ElseIf cel.Row < CHART_HEADER_ROW Then
+            If Not Application.Intersect(cel, ThisWorkbook.Names("TB_Units").RefersToRange) _
+               Is Nothing Then
+                SetLengthUnits CStr(cel.Value)
+            End If
+            modState.MarkDirty
+        End If
+    Next cel
+
+    If n = 0 Then
+        ApplyHarnessEdit = modContract.Failure("NO_OP")
+    Else
+        ApplyHarnessEdit = modContract.Success("CELLS_REBUILT", n)
+    End If
+End Function

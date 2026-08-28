@@ -182,3 +182,39 @@ Public Function RemoveConnectorInstance(ByVal sRefDes As String) As Boolean
 CleanUp:
     Application.EnableEvents = bEvents
 End Function
+
+' Everything shConnectors's Worksheet_Change decides. sPriorRefDes and
+' nPriorRow come from the sheet module's SelectionChange bookkeeping, which
+' is genuine event-lifecycle state and stays there. On rejection the
+' payload is the value the caller must write back into the cell.
+Public Function ApplyConnectorEdit(rTarget As Range, ByVal sPriorRefDes As String, _
+                                   ByVal nPriorRow As Long) As Variant
+    Dim rw As Range, sRef As String, sNewRefDes As String
+
+    modState.MarkDirty
+
+    For Each rw In rTarget.Rows
+        If rw.Row >= CONN_FIRST_ROW Then
+            sRef = Trim$(CStr(rTarget.Worksheet.Cells(rw.Row, 1).Value))
+            modChart.RefreshChartRowsForConnector sRef
+        End If
+    Next rw
+
+    If Not (rTarget.Cells.Count = 1 And rTarget.Column = 1 _
+            And rTarget.Row = nPriorRow And Len(sPriorRefDes) > 0) Then
+        ApplyConnectorEdit = modContract.Failure("NO_RENAME")
+        Exit Function
+    End If
+
+    sNewRefDes = Trim$(CStr(rTarget.Value))
+    If StrComp(sNewRefDes, sPriorRefDes, vbTextCompare) = 0 Then
+        ApplyConnectorEdit = modContract.Failure("NO_RENAME")
+        Exit Function
+    End If
+
+    If RenameRefDes(sPriorRefDes, sNewRefDes) Then
+        ApplyConnectorEdit = modContract.Success("RENAMED", sNewRefDes)
+    Else
+        ApplyConnectorEdit = modContract.Failure("RENAME_REJECTED", sPriorRefDes)
+    End If
+End Function

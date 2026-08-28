@@ -2,16 +2,15 @@ Private mLastRefDes As String
 Private mLastRefDesRow As Long
 
 Private Sub Worksheet_SelectionChange(ByVal Target As Range)
-    If Target.Cells.Count = 1 And Target.Column = 1 And Target.Row >= modConnectors.CONN_FIRST_ROW Then
+    If Target.Cells.Count = 1 And Target.Column = 1 _
+       And Target.Row >= modConnectors.CONN_FIRST_ROW Then
         mLastRefDesRow = Target.Row
         mLastRefDes = Trim$(CStr(Target.Value))
     End If
 End Sub
 
 Private Sub Worksheet_Change(ByVal Target As Range)
-    Dim bEvents As Boolean
-    Dim rw As Range
-    Dim sRef As String
+    Dim bEvents As Boolean, vResult As Variant
 
     If Not Application.EnableEvents Then Exit Sub
 
@@ -19,30 +18,14 @@ Private Sub Worksheet_Change(ByVal Target As Range)
     Application.EnableEvents = False
     On Error GoTo CleanUp
 
-    modState.MarkDirty
+    vResult = modConnectors.ApplyConnectorEdit(Target, mLastRefDes, mLastRefDesRow)
 
-    If Target.Cells.Count = 1 And Target.Column = 1 And Target.Row = mLastRefDesRow _
-       And Len(mLastRefDes) > 0 Then
-        Dim sNewRefDes As String
-        sNewRefDes = Trim$(CStr(Target.Value))
-        If StrComp(sNewRefDes, mLastRefDes, vbTextCompare) <> 0 Then
-            If Not modConnectors.RenameRefDes(mLastRefDes, sNewRefDes) Then
-                Target.Value = mLastRefDes
-            Else
-                mLastRefDes = sNewRefDes
-            End If
-        End If
-    End If
-
-    ' A pin-count (or other) edit to an existing connector row must refresh
-    ' any chart rows already referencing it, so their pin dropdowns stay
-    ' in sync with the connector's current pin count.
-    For Each rw In Target.Rows
-        If rw.Row >= modConnectors.CONN_FIRST_ROW Then
-            sRef = Trim$(CStr(Me.Cells(rw.Row, 1).Value))
-            modChart.RefreshChartRowsForConnector sRef
-        End If
-    Next rw
+    Select Case modContract.Outcome(vResult)
+        Case "RENAMED"
+            mLastRefDes = CStr(modContract.Payload(vResult))
+        Case "RENAME_REJECTED"
+            Target.Value = CStr(modContract.Payload(vResult))
+    End Select
 
 CleanUp:
     Application.EnableEvents = bEvents
