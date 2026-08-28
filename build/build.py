@@ -21,7 +21,7 @@ LIBRARY_NAME = "ConnectorLibrary.xlsx"
 VBA_MODULES = [
     "modUtil.bas", "modState.bas", "modConnectors.bas", "modChart.bas",
     "modLibrary.bas", "modPinEditor.bas", "clsPinMarker.cls", "modSnapshot.bas",
-    "modConnectorUI.bas", "modLibraryTransfer.bas",
+    "modConnectorUI.bas", "modLibraryTransfer.bas", "modContract.bas",
 ]
 BUILD_VERSION = "0.1.0"
 
