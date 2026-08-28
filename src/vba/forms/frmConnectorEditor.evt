@@ -31,7 +31,7 @@ End Sub
 
 ' Called (after Load, before Show) by frmManageLibrary's cmdEdit_Click,
 ' which has already seeded _Edit's scratch pins. vFields is the 1-based
-' array modLibrary.ReadConnector returns to an in-process caller.
+' array a connector read (in-process, not via Application.Run) returns.
 Public Sub LoadForEdit(ByVal sConnectorID As String, ByVal vFields As Variant, _
                        wsLibPhotos As Worksheet)
     mConnectorID = sConnectorID
@@ -219,18 +219,17 @@ Private Sub cmdDeletePin_Click()
 End Sub
 
 Private Sub cmdClearPins_Click()
-    modPinEditor.ClearScratchPins ThisWorkbook.Worksheets("_Edit")
+    modEditorActions.ClearAllPins ThisWorkbook.Worksheets("_Edit")
     RebuildPinList
 End Sub
 
 Private Sub cmdSnapLabel_Click()
-    Dim nPinNumber As Long
+    Dim nPinNumber As Long, vResult As Variant
     nPinNumber = SelectedPinNumber()
     If nPinNumber = 0 Then Exit Sub
 
-    If modPinEditor.SnapLabelToPin(ThisWorkbook.Worksheets("_Edit"), mConnectorID, nPinNumber) Then
-        RebuildPinList
-    End If
+    vResult = modEditorActions.SnapLabelRequest(ThisWorkbook.Worksheets("_Edit"), mConnectorID, nPinNumber)
+    If modContract.Ok(vResult) Then RebuildPinList
 End Sub
 
 Private Sub cmdSave_Click()

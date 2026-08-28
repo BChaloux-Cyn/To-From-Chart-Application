@@ -52,7 +52,3 @@ End Sub
 Public Function IsDirty() As Boolean
     IsDirty = (UCase$(GetState("Dirty")) = "TRUE")
 End Function
-
-Public Function IsTestMode() As Boolean
-    IsTestMode = (UCase$(GetState("TestMode")) = "TRUE")
-End Function

@@ -118,12 +118,29 @@ Public Function PhotoSourceForEdit(ByVal sWorkbookPath As String, _
     PhotoSourceForEdit = modContract.Success("CACHE_READY", sCachePath)
 End Function
 
+' Clearing every placed pin is a user-intent transaction like any other -
+' routed through this module rather than called directly, even though the
+' layer 0 primitive it wraps takes no ConnectorID and cannot fail.
+Public Function ClearAllPins(wsScratch As Worksheet) As Variant
+    modPinEditor.ClearScratchPins wsScratch
+    ClearAllPins = modContract.Success("OK")
+End Function
+
 Public Function DeletePinRequest(wsScratch As Worksheet, ByVal sConnectorID As String, _
                                  ByVal nPinNumber As Long) As Variant
     If modPinEditor.RemovePin(wsScratch, sConnectorID, nPinNumber) Then
         DeletePinRequest = modContract.Success("PIN_DELETED", nPinNumber)
     Else
         DeletePinRequest = modContract.Failure("PIN_NOT_FOUND", nPinNumber)
+    End If
+End Function
+
+Public Function SnapLabelRequest(wsScratch As Worksheet, ByVal sConnectorID As String, _
+                                 ByVal nPinNumber As Long) As Variant
+    If modPinEditor.SnapLabelToPin(wsScratch, sConnectorID, nPinNumber) Then
+        SnapLabelRequest = modContract.Success("OK")
+    Else
+        SnapLabelRequest = modContract.Failure("PIN_NOT_FOUND", nPinNumber)
     End If
 End Function
 

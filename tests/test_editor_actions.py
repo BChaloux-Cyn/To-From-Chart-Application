@@ -121,6 +121,36 @@ def test_photo_source_is_cache_ready_once_the_file_exists(wb, tmp_path):
     assert result.payload == cache
 
 
+def test_clear_all_pins_removes_every_placed_pin(wb):
+    ws = wb.Worksheets("_Edit")
+    run(wb, "modPinEditor.ClearScratchPins", ws)
+    write_scratch_pin(wb, ws, "J1", 1, "Pin 1", 0.1, 0.1, 0.1, 0.1)
+    write_scratch_pin(wb, ws, "J1", 2, "Pin 2", 0.2, 0.2, 0.2, 0.2)
+
+    result = run_action(wb, "modEditorActions.ClearAllPins", ws)
+    assert (result.ok, result.outcome) == (True, "OK")
+    assert run(wb, "modEditorActions.PinListItems", ws, "J1") is None
+
+
+def test_snap_label_moves_the_label_back_onto_its_pin(wb):
+    ws = wb.Worksheets("_Edit")
+    run(wb, "modPinEditor.ClearScratchPins", ws)
+    write_scratch_pin(wb, ws, "J1", 1, "Pin 1", 0.5, 0.5, 0.9, 0.9)
+
+    result = run_action(wb, "modEditorActions.SnapLabelRequest", ws, "J1", 1)
+    assert (result.ok, result.outcome) == (True, "OK")
+    items = run(wb, "modEditorActions.PinListItems", ws, "J1")
+    assert items[0][2] == pytest.approx(0.5)
+    assert items[0][3] == pytest.approx(0.5)
+
+
+def test_snap_label_reports_a_missing_pin(wb):
+    ws = wb.Worksheets("_Edit")
+    run(wb, "modPinEditor.ClearScratchPins", ws)
+    result = run_action(wb, "modEditorActions.SnapLabelRequest", ws, "J1", 9)
+    assert (result.ok, result.outcome, result.payload) == (False, "PIN_NOT_FOUND", 9)
+
+
 def test_delete_pin_removes_it_from_the_scratch_sheet(wb):
     ws = wb.Worksheets("_Edit")
     run(wb, "modPinEditor.ClearScratchPins", ws)

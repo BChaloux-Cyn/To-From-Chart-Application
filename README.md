@@ -43,7 +43,9 @@ are lost on the next build.
 | `build/excel_com.py` | COM lifecycle, VBA injection, prerequisite check |
 | `build/layout.py` | Sheet layout constants and builders |
 | `build/build.py` | Build orchestration and CLI |
-| `src/vba/` | VBA modules; `sheets/*.evt` are worksheet event handlers |
+| `src/vba/mod{Contract,Messages}.bas` | Result envelope and user-visible text |
+| `src/vba/mod*Actions.bas` | User-intent transactions; the only thing forms may call |
+| `src/vba/` | Layer 0 primitives; `sheets/*.evt` and `forms/*.evt` are UI adapters |
 | `tests/` | pytest suites driving Excel COM |
 | `docs/superpowers/specs/` | Design spec |
 | `docs/superpowers/plans/` | Implementation plans |
