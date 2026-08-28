@@ -212,3 +212,79 @@ def test_pin_numbers_are_not_reused_after_a_deletion(wb):
     result = run_action(wb, "modEditorActions.PhotoClickAction",
                         ws, "J1", True, 0, "9", 0.4, 0.4)
     assert result.payload == 4
+
+
+from tests.fixtures.sample_photo import write_sample_photo
+
+FIELDS = ("Deutsch DTM 4-way", "Deutsch", "DTM06-4S", "Connector", "4", "some notes")
+NOW = "2026-08-28T09:00:00Z"
+
+
+def save(wb, library_wb, connector_id, original_id, photo_path, fields=FIELDS):
+    return run_action(
+        wb, "modEditorActions.SaveFromEditor",
+        library_wb.Worksheets("Connectors"), library_wb.Worksheets("Pins"),
+        library_wb.Worksheets("Photos"), wb.Worksheets("_Edit"),
+        connector_id, original_id, fields, photo_path, NOW,
+    )
+
+
+def test_save_writes_the_connector_row_and_its_pins(wb, library_wb, tmp_path):
+    photo = write_sample_photo(tmp_path / "photo.jpg")
+    ws = wb.Worksheets("_Edit")
+    run(wb, "modPinEditor.ClearScratchPins", ws)
+    write_scratch_pin(wb, ws, "DTM-04P", 1, "Pin 1", 0.1, 0.2, 0.3, 0.4)
+
+    result = save(wb, library_wb, "DTM-04P", "", str(photo))
+    assert (result.ok, result.outcome, result.payload) == (True, "SAVED", "DTM-04P")
+
+    row = run(wb, "modLibrary.ReadConnector",
+              library_wb.Worksheets("Connectors"), 2, 100000, "DTM-04P")
+    assert row[1] == "Deutsch DTM 4-way"      # Name
+    assert row[5] == 4                         # PinCount, coerced from "4"
+    assert row[8] == NOW                       # CreatedUtc, passed in, not read from Now
+    pins = run(wb, "modLibrary.ReadPinsForConnector",
+               library_wb.Worksheets("Pins"), 2, 100000, "DTM-04P")
+    assert len(pins) == 1
+
+
+def test_save_rejects_an_id_that_collides_with_a_different_connector(wb, library_wb, tmp_path):
+    photo = write_sample_photo(tmp_path / "photo.jpg")
+    save(wb, library_wb, "DTM-04P", "", str(photo))
+
+    # A different connector (original id AMP-02) now derives the same id.
+    result = save(wb, library_wb, "DTM-04P", "AMP-02", str(photo))
+    assert (result.ok, result.outcome, result.payload) == (False, "ID_COLLISION", "DTM-04P")
+
+
+def test_resaving_the_same_connector_is_not_a_collision(wb, library_wb, tmp_path):
+    photo = write_sample_photo(tmp_path / "photo.jpg")
+    save(wb, library_wb, "DTM-04P", "", str(photo))
+
+    result = save(wb, library_wb, "DTM-04P", "DTM-04P", str(photo))
+    assert (result.ok, result.outcome) == (True, "SAVED")
+
+
+def test_saving_with_no_photo_fails_loudly_rather_than_silently(wb, library_wb):
+    # The pre-refactor build closed the library and did nothing at all here,
+    # leaving the student with no indication why Save had no effect.
+    result = save(wb, library_wb, "NOPHOTO-01", "", "")
+    assert (result.ok, result.outcome, result.payload) == (False, "SAVE_FAILED", "NOPHOTO-01")
+
+
+def test_save_replaces_the_previous_pin_set_rather_than_appending(wb, library_wb, tmp_path):
+    photo = write_sample_photo(tmp_path / "photo.jpg")
+    ws = wb.Worksheets("_Edit")
+    run(wb, "modPinEditor.ClearScratchPins", ws)
+    write_scratch_pin(wb, ws, "DTM-04P", 1, "Pin 1", 0.1, 0.1, 0.1, 0.1)
+    write_scratch_pin(wb, ws, "DTM-04P", 2, "Pin 2", 0.2, 0.2, 0.2, 0.2)
+    save(wb, library_wb, "DTM-04P", "", str(photo))
+
+    run(wb, "modPinEditor.ClearScratchPins", ws)
+    write_scratch_pin(wb, ws, "DTM-04P", 1, "Pin 1", 0.9, 0.9, 0.9, 0.9)
+    save(wb, library_wb, "DTM-04P", "DTM-04P", str(photo))
+
+    pins = run(wb, "modLibrary.ReadPinsForConnector",
+               library_wb.Worksheets("Pins"), 2, 100000, "DTM-04P")
+    assert len(pins) == 1
+    assert pins[0][3] == pytest.approx(0.9)

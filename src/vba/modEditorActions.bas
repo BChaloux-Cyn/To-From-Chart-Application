@@ -182,3 +182,40 @@ Public Function PhotoClickAction(wsScratch As Worksheet, ByVal sConnectorID As S
 
     PhotoClickAction = modContract.Failure("NO_OP")
 End Function
+
+' The whole Save transaction bar the workbook open, close, and photo copy,
+' which stay in the adapter. vFields is zero based: name, manufacturer,
+' part number, type, pin count AS TEXT, notes - the pin count arrives as
+' the text box supplies it so the coercion is tested here.
+' sNowUtc is passed in rather than read from Now, which keeps this
+' deterministic and lets a test assert the exact timestamp written.
+Public Function SaveFromEditor(wsLibConn As Worksheet, wsLibPins As Worksheet, _
+                               wsLibPhotos As Worksheet, wsScratch As Worksheet, _
+                               ByVal sConnectorID As String, ByVal sOriginalID As String, _
+                               ByVal vFields As Variant, ByVal sPhotoPath As String, _
+                               ByVal sNowUtc As String) As Variant
+    Dim nExistingRow As Long
+
+    ' A collision only matters when the row it would overwrite belongs to a
+    ' DIFFERENT connector than the one this session opened for editing -
+    ' re-saving the connector you are editing must not flag itself.
+    nExistingRow = modLibrary.FindConnectorRow(wsLibConn, 2, modLibrary.LIB_ROW_CAP, sConnectorID)
+    If nExistingRow > 0 And StrComp(sConnectorID, sOriginalID, vbTextCompare) <> 0 Then
+        SaveFromEditor = modContract.Failure("ID_COLLISION", sConnectorID)
+        Exit Function
+    End If
+
+    If modPinEditor.SaveConnector(wsLibConn, wsLibPins, wsLibPhotos, wsScratch, _
+            sConnectorID, _
+            CStr(vFields(LBound(vFields))), _
+            CStr(vFields(LBound(vFields) + 1)), _
+            CStr(vFields(LBound(vFields) + 2)), _
+            CStr(vFields(LBound(vFields) + 3)), _
+            CLng(Val(CStr(vFields(LBound(vFields) + 4)))), _
+            CStr(vFields(LBound(vFields) + 5)), _
+            sPhotoPath, sNowUtc, sNowUtc, "Local") Then
+        SaveFromEditor = modContract.Success("SAVED", sConnectorID)
+    Else
+        SaveFromEditor = modContract.Failure("SAVE_FAILED", sConnectorID)
+    End If
+End Function
