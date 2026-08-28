@@ -8,11 +8,6 @@ Private Sub UserForm_Initialize()
     RefreshList
 End Sub
 
-' QueryClose fires for every unload path - a button's Unload Me as well as
-' the form's own system Close (X) button - so this is the one place that
-' needs to close mLibrary. On Error Resume Next covers the button-click
-' paths, which unload the form after already reading what they need; by
-' the time QueryClose runs there is nothing left to close.
 Private Sub UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)
     On Error Resume Next
     mLibrary.Close SaveChanges:=False
@@ -20,66 +15,71 @@ Private Sub UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)
 End Sub
 
 Private Sub RefreshList()
-    mConnectorIDs = modConnectorUI.RefreshConnectorList(mLibrary.Worksheets("Connectors"), lstConnectors)
+    Dim vIndex As Variant, i As Long, n As Long
+
+    lstConnectors.Clear
+    Erase mConnectorIDs
+
+    vIndex = modLibrary.ConnectorIndex(mLibrary.Worksheets("Connectors"))
+    n = modContract.TableRowCount(vIndex)
+    If n = 0 Then Exit Sub
+
+    ReDim mConnectorIDs(1 To n)
+    For i = 1 To n
+        lstConnectors.AddItem CStr(vIndex(i, 1))
+        mConnectorIDs(i) = CStr(vIndex(i, 2))
+    Next i
 End Sub
 
-Private Sub cmdEdit_Click()
-    If lstConnectors.ListIndex < 0 Then Exit Sub
-    Dim sConnectorID As String
-    sConnectorID = mConnectorIDs(lstConnectors.ListIndex + 1)
+Private Function SelectedConnectorID() As String
+    If lstConnectors.ListIndex < 0 Then Exit Function
+    SelectedConnectorID = mConnectorIDs(lstConnectors.ListIndex + 1)
+End Function
 
-    Dim vFields As Variant
-    vFields = modLibrary.ReadConnector(mLibrary.Worksheets("Connectors"), 2, modLibrary.LIB_ROW_CAP, sConnectorID)
+Private Sub cmdEdit_Click()
+    Dim sConnectorID As String, vFields As Variant
+    sConnectorID = SelectedConnectorID()
+    If Len(sConnectorID) = 0 Then Exit Sub
+
+    vFields = modLibrary.ReadConnector(mLibrary.Worksheets("Connectors"), 2, _
+                                       modLibrary.LIB_ROW_CAP, sConnectorID)
     If IsEmpty(vFields) Then Exit Sub
 
-    modPinEditor.LoadScratchPins ThisWorkbook.Worksheets("_Edit"), mLibrary.Worksheets("Pins"), sConnectorID
+    modPinEditor.LoadScratchPins ThisWorkbook.Worksheets("_Edit"), _
+        mLibrary.Worksheets("Pins"), sConnectorID
 
-    ' Load (not Show) instantiates frmConnectorEditor and runs its
-    ' UserForm_Initialize, so LoadForEdit can populate it before the form is
-    ' shown. LoadForEdit reads the photo preview from an on-disk cache
-    ' (modLibrary.CachePhotoPath); wsLibPhotos is only needed as a backfill
-    ' source if that cache doesn't exist yet (see LoadExistingPhoto).
+    ' Load (not Show) runs UserForm_Initialize so LoadForEdit can populate
+    ' the form before it is shown. Unloading this form first was observed
+    ' to discard everything LoadForEdit had just written, so Show (modal,
+    ' blocking) comes first, with this form's own unload as the final step.
     Load frmConnectorEditor
     frmConnectorEditor.LoadForEdit sConnectorID, vFields, mLibrary.Worksheets("Photos")
-
-    ' Unloading Me (this form) before showing frmConnectorEditor - while
-    ' still inside this form's own click handler - was observed to discard
-    ' everything LoadForEdit just populated (frmConnectorEditor came up
-    ' blank, UserForm_Initialize visibly re-firing). Show first (modal, so
-    ' this blocks until the student closes it via Save/Cancel), then unload.
     frmConnectorEditor.Show
+
     Unload Me
 End Sub
 
 Private Sub cmdDelete_Click()
-    If lstConnectors.ListIndex < 0 Then Exit Sub
-    Dim sConnectorID As String
-    sConnectorID = mConnectorIDs(lstConnectors.ListIndex + 1)
+    Dim sConnectorID As String, vResult As Variant
+    sConnectorID = SelectedConnectorID()
+    If Len(sConnectorID) = 0 Then Exit Sub
 
     If MsgBox("Delete " & sConnectorID & " from the library? This cannot be undone.", _
               vbYesNo + vbQuestion) <> vbYes Then Exit Sub
 
-    modLibrary.DeleteConnector mLibrary.Worksheets("Connectors"), 2, modLibrary.LIB_ROW_CAP, sConnectorID
-    modLibrary.DeletePinsForConnector mLibrary.Worksheets("Pins"), 2, modLibrary.LIB_ROW_CAP, sConnectorID
-    modLibrary.RemoveConnectorPhoto mLibrary.Worksheets("Photos"), sConnectorID
+    vResult = modManageActions.DeleteFromLibrary(mLibrary.Worksheets("Connectors"), _
+        mLibrary.Worksheets("Pins"), mLibrary.Worksheets("Photos"), _
+        ThisWorkbook.Path, sConnectorID)
     mLibrary.Save
-
-    ' Also remove the editor's on-disk preview cache (modLibrary.CachePhotoPath)
-    ' - otherwise it's orphaned, since nothing else ever reads a cache file
-    ' whose connector no longer exists.
-    Dim sCachePath As String
-    sCachePath = modLibrary.CachePhotoPath(ThisWorkbook.Path, sConnectorID, "jpg")
-    If Len(Dir$(sCachePath)) > 0 Then Kill sCachePath
 
     RefreshList
 End Sub
 
 Private Sub cmdExport_Click()
-    If lstConnectors.ListIndex < 0 Then Exit Sub
-    Dim sConnectorID As String
-    sConnectorID = mConnectorIDs(lstConnectors.ListIndex + 1)
+    Dim sConnectorID As String, sPath As Variant, vResult As Variant
+    sConnectorID = SelectedConnectorID()
+    If Len(sConnectorID) = 0 Then Exit Sub
 
-    Dim sPath As Variant
     sPath = Application.GetSaveAsFilename( _
         InitialFileName:=sConnectorID & "_export.xlsx", _
         FileFilter:="Excel Workbook (*.xlsx), *.xlsx")
@@ -87,20 +87,14 @@ Private Sub cmdExport_Click()
 
     Dim destWb As Workbook
     Set destWb = Workbooks.Add
-    modLibraryTransfer.BuildExportSheets destWb
 
-    Dim ok As Boolean
-    ok = modLibraryTransfer.ExportConnector(mLibrary.Worksheets("Connectors"), mLibrary.Worksheets("Pins"), _
-        mLibrary.Worksheets("Photos"), destWb.Worksheets("Connectors"), destWb.Worksheets("Pins"), _
-        destWb.Worksheets("Photos"), sConnectorID)
+    vResult = modManageActions.ExportToWorkbook(mLibrary.Worksheets("Connectors"), _
+        mLibrary.Worksheets("Pins"), mLibrary.Worksheets("Photos"), destWb, sConnectorID)
 
-    If ok Then
-        destWb.SaveAs Filename:=CStr(sPath), FileFormat:=51
-        MsgBox "Exported " & sConnectorID & ".", vbInformation
-    Else
-        MsgBox "Could not export " & sConnectorID & ".", vbExclamation
-    End If
+    If modContract.Ok(vResult) Then destWb.SaveAs Filename:=CStr(sPath), FileFormat:=51
     destWb.Close SaveChanges:=False
+
+    MsgBox modMessages.MessageFor(vResult), modMessages.MessageStyleFor(vResult)
 End Sub
 
 Private Sub cmdImport_Click()
@@ -111,50 +105,31 @@ Private Sub cmdImport_Click()
     Dim srcWb As Workbook
     Set srcWb = Workbooks.Open(CStr(sPath))
 
-    Dim sOriginName As String
-    sOriginName = srcWb.Name
+    Dim vResult As Variant
+    vResult = modManageActions.ImportAllFromWorkbook(srcWb, _
+        mLibrary.Worksheets("Connectors"), mLibrary.Worksheets("Pins"), _
+        mLibrary.Worksheets("Photos"))
+    srcWb.Close SaveChanges:=False
 
-    Dim nLast As Long, r As Long, sConnectorID As String, sDestID As String
-    Dim wsSrcConn As Worksheet
-    Set wsSrcConn = srcWb.Worksheets("Connectors")
-    nLast = wsSrcConn.Cells(wsSrcConn.Rows.Count, 1).End(xlUp).Row
-
-    For r = 2 To nLast
-        sConnectorID = Trim$(CStr(wsSrcConn.Cells(r, modLibrary.LIB_COL_ID).Value))
-        If Len(sConnectorID) > 0 Then
-            sDestID = modLibraryTransfer.ImportConnector(wsSrcConn, srcWb.Worksheets("Pins"), _
-                srcWb.Worksheets("Photos"), mLibrary.Worksheets("Connectors"), mLibrary.Worksheets("Pins"), _
-                mLibrary.Worksheets("Photos"), sConnectorID, sOriginName)
-
-            If Len(sDestID) > 0 Then
-                ' ImportConnector already attempted the photo copy internally -
-                ' calling CopyConnectorPhoto again here would redo a clipboard
-                ' operation that may not even be deterministic, and could give
-                ' a different answer than the one that actually happened. Check
-                ' whether the shape it should have produced exists instead.
-                Dim bPhotoExists As Boolean
-                bPhotoExists = False
-                On Error Resume Next
-                bPhotoExists = Not (mLibrary.Worksheets("Photos").Shapes("PHOTO_" & sDestID) Is Nothing)
-                On Error GoTo 0
-
-                If Not bPhotoExists Then
-                    Dim sReplacement As Variant
-                    sReplacement = Application.GetOpenFilename( _
-                        "Pictures (*.png; *.jpg; *.jpeg; *.bmp), *.png;*.jpg;*.jpeg;*.bmp", _
-                        , "Photo for " & sDestID & " could not be extracted - choose a replacement")
-                    If sReplacement <> False Then
-                        modLibrary.EmbedConnectorPhoto mLibrary.Worksheets("Photos"), sDestID, CStr(sReplacement)
-                    End If
-                End If
+    ' Prompt only for the connectors whose photo could not be carried over.
+    Dim vRows As Variant, i As Long, sDestID As String, sReplacement As Variant
+    vRows = modContract.Payload(vResult)
+    For i = 1 To modContract.TableRowCount(vRows)
+        If Not CBool(vRows(i, 2)) Then
+            sDestID = CStr(vRows(i, 1))
+            sReplacement = Application.GetOpenFilename( _
+                "Pictures (*.png; *.jpg; *.jpeg; *.bmp), *.png;*.jpg;*.jpeg;*.bmp", _
+                , "Photo for " & sDestID & " could not be extracted - choose a replacement")
+            If sReplacement <> False Then
+                modManageActions.AttachReplacementPhoto mLibrary.Worksheets("Photos"), _
+                    sDestID, CStr(sReplacement)
             End If
         End If
-    Next r
+    Next i
 
-    srcWb.Close SaveChanges:=False
     mLibrary.Save
     RefreshList
-    MsgBox "Import complete.", vbInformation
+    MsgBox modMessages.MessageFor(vResult), modMessages.MessageStyleFor(vResult)
 End Sub
 
 Private Sub cmdClose_Click()

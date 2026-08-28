@@ -96,20 +96,14 @@ def test_connector_editor_supports_loading_an_existing_connector(wb):
 
 
 def test_manage_library_delete_calls_library_delete_functions(wb):
-    source = module_source(wb, "frmManageLibrary")
-    assert "modLibrary.DeleteConnector" in source
-    assert "modLibrary.DeletePinsForConnector" in source
-
-
-def test_manage_library_delete_also_removes_the_photo_cache_file(wb):
-    # The editor-preview cache (modLibrary.CachePhotoPath, introduced
-    # alongside the LoadExistingPhoto fix) would otherwise be orphaned once
-    # its connector no longer exists.
+    # modManageActions.DeleteFromLibrary (Task 13) is the one place that
+    # calls DeleteConnector/DeletePinsForConnector/RemoveConnectorPhoto and
+    # removes the editor's on-disk preview cache - the form delegates to it
+    # rather than calling those layer 0 primitives directly.
     source = module_source(wb, "frmManageLibrary")
     delete_click = source[source.index("Private Sub cmdDelete_Click"):]
     body = delete_click.split("End Sub", 1)[0]
-    assert "modLibrary.CachePhotoPath(ThisWorkbook.Path, sConnectorID, \"jpg\")" in body
-    assert "Kill sCachePath" in body
+    assert "modManageActions.DeleteFromLibrary" in body
 
 
 @pytest.mark.parametrize("form_name", ["frmConnectorPicker", "frmManageLibrary"])

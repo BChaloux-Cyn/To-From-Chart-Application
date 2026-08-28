@@ -75,3 +75,69 @@ def test_exporting_an_unknown_connector_fails(wb, app, library_wb):
         assert (result.ok, result.outcome, result.payload) == (False, "EXPORT_FAILED", "NOPE")
     finally:
         dest.Close(SaveChanges=False)
+
+
+def test_import_copies_every_connector_and_reports_photo_status(wb, app, library_wb, tmp_path):
+    seed(wb, library_wb, tmp_path, "DTM-04P")
+    export_path = tmp_path / "export.xlsx"
+    dest = app.Workbooks.Add()
+    try:
+        run_action(wb, "modManageActions.ExportToWorkbook",
+                   library_wb.Worksheets("Connectors"), library_wb.Worksheets("Pins"),
+                   library_wb.Worksheets("Photos"), dest, "DTM-04P")
+        dest.SaveAs(Filename=str(export_path), FileFormat=51)
+    finally:
+        dest.Close(SaveChanges=False)
+
+    src = app.Workbooks.Open(str(export_path))
+    try:
+        # Import into a library that does not yet hold this connector.
+        run(wb, "modLibrary.DeleteConnector", library_wb.Worksheets("Connectors"),
+            2, 100000, "DTM-04P")
+
+        result = run_action(
+            wb, "modManageActions.ImportAllFromWorkbook", src,
+            library_wb.Worksheets("Connectors"), library_wb.Worksheets("Pins"),
+            library_wb.Worksheets("Photos"),
+        )
+        assert (result.ok, result.outcome) == (True, "IMPORTED")
+        assert [row[0] for row in result.payload] == ["DTM-04P"]
+        assert isinstance(result.payload[0][1], bool)
+    finally:
+        src.Close(SaveChanges=False)
+
+
+def test_import_of_an_empty_workbook_reports_an_empty_table(wb, app, library_wb, tmp_path):
+    empty_path = tmp_path / "empty.xlsx"
+    dest = app.Workbooks.Add()
+    try:
+        run(wb, "modLibraryTransfer.BuildExportSheets", dest)
+        dest.SaveAs(Filename=str(empty_path), FileFormat=51)
+    finally:
+        dest.Close(SaveChanges=False)
+
+    src = app.Workbooks.Open(str(empty_path))
+    try:
+        result = run_action(
+            wb, "modManageActions.ImportAllFromWorkbook", src,
+            library_wb.Worksheets("Connectors"), library_wb.Worksheets("Pins"),
+            library_wb.Worksheets("Photos"),
+        )
+        assert result.outcome == "IMPORTED"
+        assert run(wb, "modContract.TableRowCount", result.payload) == 0
+    finally:
+        src.Close(SaveChanges=False)
+
+
+def test_attach_replacement_photo_embeds_the_chosen_file(wb, library_wb, tmp_path):
+    photo = write_sample_photo(tmp_path / "replacement.png")
+    result = run_action(wb, "modManageActions.AttachReplacementPhoto",
+                        library_wb.Worksheets("Photos"), "DTM-04P", str(photo))
+    assert (result.ok, result.outcome, result.payload) == (True, "PHOTO_ATTACHED", "DTM-04P")
+
+
+def test_attach_replacement_photo_reports_a_missing_file(wb, library_wb, tmp_path):
+    result = run_action(wb, "modManageActions.AttachReplacementPhoto",
+                        library_wb.Worksheets("Photos"), "DTM-04P",
+                        str(tmp_path / "does-not-exist.png"))
+    assert (result.ok, result.outcome, result.payload) == (False, "PHOTO_FAILED", "DTM-04P")
