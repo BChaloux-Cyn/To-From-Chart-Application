@@ -137,3 +137,78 @@ def test_delete_pin_reports_a_missing_pin(wb):
     run(wb, "modPinEditor.ClearScratchPins", ws)
     result = run_action(wb, "modEditorActions.DeletePinRequest", ws, "J1", 9)
     assert (result.ok, result.outcome, result.payload) == (False, "PIN_NOT_FOUND", 9)
+
+
+def test_click_in_place_mode_places_the_next_pin(wb):
+    ws = wb.Worksheets("_Edit")
+    run(wb, "modPinEditor.ClearScratchPins", ws)
+
+    result = run_action(wb, "modEditorActions.PhotoClickAction",
+                        ws, "J1", True, 0, "4", 0.25, 0.75)
+    assert (result.ok, result.outcome, result.payload) == (True, "PLACED", 1)
+
+    items = run(wb, "modEditorActions.PinListItems", ws, "J1")
+    assert items[0][2] == pytest.approx(0.25)
+    assert items[0][3] == pytest.approx(0.75)
+
+
+def test_placing_is_capped_at_the_entered_pin_count(wb):
+    ws = wb.Worksheets("_Edit")
+    run(wb, "modPinEditor.ClearScratchPins", ws)
+    for _ in range(2):
+        run_action(wb, "modEditorActions.PhotoClickAction", ws, "J1", True, 0, "2", 0.1, 0.1)
+
+    result = run_action(wb, "modEditorActions.PhotoClickAction",
+                        ws, "J1", True, 0, "2", 0.5, 0.5)
+    assert (result.ok, result.outcome, result.payload) == (False, "PIN_LIMIT_REACHED", 2)
+
+
+@pytest.mark.parametrize("pin_count_text", ["", "   ", "abc", "0", "-3"])
+def test_a_non_positive_pin_count_is_rejected(wb, pin_count_text):
+    ws = wb.Worksheets("_Edit")
+    run(wb, "modPinEditor.ClearScratchPins", ws)
+    result = run_action(wb, "modEditorActions.PhotoClickAction",
+                        ws, "J1", True, 0, pin_count_text, 0.5, 0.5)
+    assert (result.ok, result.outcome) == (False, "BAD_PIN_COUNT")
+
+
+def test_a_click_with_no_connector_id_is_a_no_op(wb):
+    ws = wb.Worksheets("_Edit")
+    run(wb, "modPinEditor.ClearScratchPins", ws)
+    result = run_action(wb, "modEditorActions.PhotoClickAction",
+                        ws, "", True, 0, "4", 0.5, 0.5)
+    assert (result.ok, result.outcome) == (False, "NO_OP")
+
+
+def test_click_out_of_place_mode_moves_the_selected_pins_anchor(wb):
+    ws = wb.Worksheets("_Edit")
+    run(wb, "modPinEditor.ClearScratchPins", ws)
+    run_action(wb, "modEditorActions.PhotoClickAction", ws, "J1", True, 0, "4", 0.1, 0.1)
+
+    result = run_action(wb, "modEditorActions.PhotoClickAction",
+                        ws, "J1", False, 1, "4", 0.8, 0.9)
+    assert (result.ok, result.outcome, result.payload) == (True, "MOVED_ANCHOR", 1)
+
+    geometry = run(wb, "modPinEditor.PinGeometry", ws, "J1", 1)
+    assert geometry[0] == pytest.approx(0.8)
+    assert geometry[1] == pytest.approx(0.9)
+
+
+def test_click_out_of_place_mode_with_nothing_selected_is_a_no_op(wb):
+    ws = wb.Worksheets("_Edit")
+    run(wb, "modPinEditor.ClearScratchPins", ws)
+    result = run_action(wb, "modEditorActions.PhotoClickAction",
+                        ws, "J1", False, 0, "4", 0.5, 0.5)
+    assert (result.ok, result.outcome) == (False, "NO_OP")
+
+
+def test_pin_numbers_are_not_reused_after_a_deletion(wb):
+    ws = wb.Worksheets("_Edit")
+    run(wb, "modPinEditor.ClearScratchPins", ws)
+    for _ in range(3):
+        run_action(wb, "modEditorActions.PhotoClickAction", ws, "J1", True, 0, "9", 0.1, 0.1)
+    run_action(wb, "modEditorActions.DeletePinRequest", ws, "J1", 2)
+
+    result = run_action(wb, "modEditorActions.PhotoClickAction",
+                        ws, "J1", True, 0, "9", 0.4, 0.4)
+    assert result.payload == 4

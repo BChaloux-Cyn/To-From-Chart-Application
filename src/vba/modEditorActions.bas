@@ -126,3 +126,59 @@ Public Function DeletePinRequest(wsScratch As Worksheet, ByVal sConnectorID As S
         DeletePinRequest = modContract.Failure("PIN_NOT_FOUND", nPinNumber)
     End If
 End Function
+
+' Everything a click on the photo can mean. bPlaceMode is the Place Pins
+' toggle; nSelectedPin is a PIN NUMBER (0 when nothing is selected), not a
+' list index - the caller resolves that through PinListItems. The placed
+' count and next pin number are derived from wsScratch rather than passed
+' in, so no counter in the form can drift out of sync with the sheet.
+Public Function PhotoClickAction(wsScratch As Worksheet, ByVal sConnectorID As String, _
+                                 ByVal bPlaceMode As Boolean, ByVal nSelectedPin As Long, _
+                                 ByVal sPinCountText As String, _
+                                 ByVal dNormX As Double, ByVal dNormY As Double) As Variant
+    If Len(Trim$(sConnectorID)) = 0 Then
+        PhotoClickAction = modContract.Failure("NO_OP")
+        Exit Function
+    End If
+
+    If bPlaceMode Then
+        Dim nPinCount As Long, nPlaced As Long, nNext As Long
+
+        If Not IsNumeric(Trim$(sPinCountText)) Then
+            PhotoClickAction = modContract.Failure("BAD_PIN_COUNT")
+            Exit Function
+        End If
+        nPinCount = CLng(Val(sPinCountText))
+        If nPinCount <= 0 Then
+            PhotoClickAction = modContract.Failure("BAD_PIN_COUNT")
+            Exit Function
+        End If
+
+        nPlaced = modContract.TableRowCount(PinListItems(wsScratch, sConnectorID))
+        If nPlaced >= nPinCount Then
+            PhotoClickAction = modContract.Failure("PIN_LIMIT_REACHED", nPinCount)
+            Exit Function
+        End If
+
+        nNext = NextPinNumber(wsScratch, sConnectorID)
+        If modPinEditor.PlacePin(wsScratch, sConnectorID, nNext, _
+                                 "Pin " & CStr(nNext), dNormX, dNormY) Then
+            PhotoClickAction = modContract.Success("PLACED", nNext)
+        Else
+            PhotoClickAction = modContract.Failure("NO_OP")
+        End If
+        Exit Function
+    End If
+
+    ' Place Pins is off and a pin is selected: the click moves that pin's
+    ' anchor. modPinEditor.MoveAnchor decides whether the marker travels
+    ' with it (it does only if it was still sitting on the anchor).
+    If nSelectedPin > 0 Then
+        If modPinEditor.MoveAnchor(wsScratch, sConnectorID, nSelectedPin, dNormX, dNormY) Then
+            PhotoClickAction = modContract.Success("MOVED_ANCHOR", nSelectedPin)
+            Exit Function
+        End If
+    End If
+
+    PhotoClickAction = modContract.Failure("NO_OP")
+End Function
