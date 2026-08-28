@@ -112,6 +112,38 @@ Public Function ReadConnector(wsConn As Worksheet, ByVal nFirstRow As Long, _
     ReadConnector = vResult
 End Function
 
+' The library's browsable index: one row per connector, holding the display
+' string a list box shows and the ConnectorID that string resolves to.
+' Rendering happens here, not in a form, so the exact text is testable.
+' Empty when the sheet holds no connectors - never a zero length array.
+Public Function ConnectorIndex(wsConn As Worksheet) As Variant
+    Dim nLast As Long, r As Long, n As Long
+    Dim vRows() As Variant
+
+    nLast = wsConn.Cells(wsConn.Rows.Count, LIB_COL_ID).End(xlUp).Row
+    If nLast < 2 Then Exit Function
+
+    ReDim vRows(1 To nLast - 1, 1 To 2)
+    For r = 2 To nLast
+        If Len(Trim$(CStr(wsConn.Cells(r, LIB_COL_ID).Value))) > 0 Then
+            n = n + 1
+            vRows(n, 1) = Trim$(CStr(wsConn.Cells(r, LIB_COL_ID).Value)) & " - " & _
+                          CStr(wsConn.Cells(r, LIB_COL_NAME).Value)
+            vRows(n, 2) = Trim$(CStr(wsConn.Cells(r, LIB_COL_ID).Value))
+        End If
+    Next r
+
+    If n = 0 Then Exit Function
+
+    Dim vResult() As Variant, i As Long
+    ReDim vResult(1 To n, 1 To 2)
+    For i = 1 To n
+        vResult(i, 1) = vRows(i, 1)
+        vResult(i, 2) = vRows(i, 2)
+    Next i
+    ConnectorIndex = vResult
+End Function
+
 Public Function DeleteConnector(wsConn As Worksheet, ByVal nFirstRow As Long, _
                                 ByVal nLastRow As Long, ByVal sConnectorID As String) As Boolean
     Dim r As Long, nLast As Long, c As Long

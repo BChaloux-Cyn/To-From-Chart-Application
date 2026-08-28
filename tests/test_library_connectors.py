@@ -69,3 +69,21 @@ def test_delete_stays_inside_its_row_window(wb, library_wb):
     run(wb, "modLibrary.DeleteConnector", ws, 2, 2, "DTM-04P")
 
     assert ws.Cells(2, 1).Value == "SENTINEL" or ws.Cells(3, 1).Value == "SENTINEL"
+
+
+def test_connector_index_renders_display_strings_and_ids(wb, library_wb):
+    ws = library_wb.Worksheets("Connectors")
+    fields_a = ("DTM-04P", "Deutsch DTM 4-way", "Deutsch", "DTM06-4S", "Connector",
+                4, "", "", "2026-08-26T00:00:00Z", "2026-08-26T00:00:00Z", "Local")
+    fields_b = ("AMP-02", "AMP 2-way", "TE", "AMP-2", "Connector",
+                2, "", "", "2026-08-26T00:00:00Z", "2026-08-26T00:00:00Z", "Local")
+    run(wb, "modLibrary.WriteConnector", ws, 2, 100000, fields_a)
+    run(wb, "modLibrary.WriteConnector", ws, 2, 100000, fields_b)
+
+    index = run(wb, "modLibrary.ConnectorIndex", ws)
+    assert [row[0] for row in index] == ["DTM-04P - Deutsch DTM 4-way", "AMP-02 - AMP 2-way"]
+    assert [row[1] for row in index] == ["DTM-04P", "AMP-02"]
+
+
+def test_connector_index_of_an_empty_sheet_is_empty(wb, library_wb):
+    assert run(wb, "modLibrary.ConnectorIndex", library_wb.Worksheets("Connectors")) is None
