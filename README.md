@@ -54,6 +54,11 @@ are lost on the next build.
 ## Status
 
 Phase 1 complete: build system, Creator shell, to-from chart with dependent
-pin dropdowns. Phases 2 to 4 (connector library and editor, harness save and
-load with rendered connector pages, validation and export) are specified but
-not yet built. See the spec for the full design.
+pin dropdowns. Phase 2 complete: connector library file and reader/writer,
+the connector editor with click-to-place pin markers, the connector picker,
+per-harness connector snapshots, ref des rename, and library import/export.
+See `docs/user-guide/user-guide.md` for how to use what's built so far, the
+`docs/superpowers/specs/` design docs for each subsystem's decisions, and
+`docs/design/` for the layering rules the code follows day to day. Phases 3
+and 4 (harness save/load with rendered connector pages, validation and
+export) are specified but not yet built.
