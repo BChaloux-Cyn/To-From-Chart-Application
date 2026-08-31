@@ -135,8 +135,13 @@ def test_controls_fit_within_the_form_width(wb, form_name):
     # Close rendered past the form's right edge (a regression from when
     # Import/Export were added without widening the form to match).
     component = wb.VBProject.VBComponents(form_name)
+    # Designer must be touched before Properties in a freshly opened
+    # workbook, or VBComponent.Properties("Width") raises a generic COM
+    # error (no description) - some lazy design-time state Properties
+    # depends on isn't initialized until Designer is accessed once.
+    controls = component.Designer.Controls
     form_width = component.Properties("Width").Value
-    for ctl in component.Designer.Controls:
+    for ctl in controls:
         assert ctl.Left + ctl.Width <= form_width, \
             f"{form_name}.{ctl.Name} extends past the form's right edge ({ctl.Left + ctl.Width} > {form_width})"
 
