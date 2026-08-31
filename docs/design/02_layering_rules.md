@@ -60,12 +60,15 @@ vPayload)`. Adapters never index a result by hand; they call
 result's shape appear only inside `modContract` itself.
 
 This exists because the codebase has two array conventions that disagree
-about 0- vs. 1-basing across the `Application.Run` boundary — see the
-[design spec](../superpowers/specs/2026-08-28-ui-logic-separation-design.md#the-envelope)
-for the concrete example. `modContract.Success`/`Failure` build with `Array`,
-which is zero-based on both the VBA and the pytest side, so `vResult(0)` and
-`result[0]` are always the same element, provided no module ever declares
-`Option Base 1`.
+about 0- vs. 1-basing across the `Application.Run` boundary: a `Dim
+vResult(1 To N) As Variant` array (used for a fixed-shape record like a
+connector row) is 1-based on both sides of the boundary, but `Array(...)`
+(used to build the result envelope) is 0-based on both sides. Mixing the
+two conventions in one return value is what would make `vResult(0)` and
+`result[0]` disagree. `modContract.Success`/`Failure` build with `Array`,
+which is zero-based on both the VBA and the pytest side, so `vResult(0)`
+and `result[0]` are always the same element, provided no module ever
+declares `Option Base 1`.
 
 `modContract.PayloadKind` declares the payload type (`NONE`, `STRING`,
 `LONG`, `DOUBLE`, `TABLE`) for every outcome code, and `Success`/`Failure`

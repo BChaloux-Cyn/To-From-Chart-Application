@@ -14,8 +14,8 @@ queued Close click fire `QueryClose` mid-action. In `frmConnectorPicker` and
 `frmManageLibrary`, that would close `mLibrary` and invalidate the very
 `Worksheet` objects the action holds.
 
-Arguments are fully evaluated before a call — `Array(Trim$(txtName.Text),
-...)` is materialized into a `Variant` array before the callee receives it,
+Arguments are fully evaluated before a call — `Array(Trim$(txtName.Text), ...)` 
+is materialized into a `Variant` array before the callee receives it,
 and `String`/`Variant` values are copied — so an action holds values rather
 than live references into the form.
 

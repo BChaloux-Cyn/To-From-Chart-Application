@@ -7,14 +7,6 @@ and every subsystem built on it, and the cross-cutting layering strategy
 that constrains all of them. Where a claim here is testable, it is anchored
 to a specific file, line, and test - not just described in prose.
 
-`docs/superpowers/plans/` and `docs/superpowers/specs/` hold the historical
-planning record instead: what was proposed before a phase was built, and
-the task-by-task reasoning behind decisions made along the way. This
-directory describes the codebase as it actually stands, verified against
-the merged code and tests, and is expected to be kept current as the
-codebase changes - consult the plans/specs for how a decision was reached
-historically, not for what is true today.
-
 ### Contents
 
 | Doc | Covers |
@@ -32,10 +24,3 @@ This directory does not cover the build system itself (`build/` and the
 sheet layout constants in `build/layout.py`; see the top-level `README.md`
 for those) or how to use the built application (`docs/user-guide/
 user-guide.md`'s job).
-
-The layering strategy specifically (docs 01-04 above) was built via the
-task-by-task extraction recorded in
-`docs/superpowers/specs/2026-08-28-ui-logic-separation-design.md` and
-`docs/superpowers/plans/2026-08-28-ui-logic-separation.md` - consult those
-for the "why" behind an edge case not covered in `02_layering_rules.md` or
-`03_handler_lifecycle.md`.

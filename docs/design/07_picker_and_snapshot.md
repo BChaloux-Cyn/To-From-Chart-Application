@@ -2,12 +2,12 @@
 
 ### Purpose
 
-This subsystem wires the library (2a) and the connector editor (2b) into
-the Creator's actual workflow: Add Connector picks a library part (or
-defines a new one) and freezes its definition into `_Snapshot`; Manage
-Library browses, edits, and deletes library entries; Remove Connector
-drops a placed instance; and ref des rename rewrites every chart reference
-and rejects collisions.
+This subsystem wires the library (`05_library_core.md`) and the connector
+editor (`06_connector_editor.md`) into the Creator's actual workflow: Add
+Connector picks a library part (or defines a new one) and freezes its
+definition into `_Snapshot`; Manage Library browses, edits, and deletes
+library entries; Remove Connector drops a placed instance; and ref des
+rename rewrites every chart reference and rejects collisions.
 
 ### `_Snapshot`'s three fixed regions
 
@@ -23,10 +23,11 @@ one physical sheet, all sized in `build/layout.py`:
 One sheet rather than three because `_Snapshot` is meant to be a single
 frozen unit copied out of `HarnessCreator.xlsm` conceptually, not a set of
 independent tables - and because `modLibrary`'s bounded-window functions
-(2a) already support multiple tables coexisting on one sheet by construction.
-200 connectors and 2000 pin rows is generous headroom for what one harness
-actually uses (a handful of connectors) while staying a small, fixed cost
-on a sheet nobody scrolls through by hand.
+(`05_library_core.md`) already support multiple tables coexisting on one
+sheet by construction. 200 connectors and 2000 pin rows is generous
+headroom for what one harness actually uses (a handful of connectors)
+while staying a small, fixed cost on a sheet nobody scrolls through by
+hand.
 
 ### `SnapshotConnector`'s idempotency
 
@@ -40,31 +41,21 @@ Connector` call is a no-op against `_Snapshot`, even though it still
 allocates its own ref des and its own `Connectors`-sheet instance row via
 `modConnectors.AddConnectorInstance`.
 
-#### The photo-cache lookup: a real bug found and fixed
+#### Photo-cache lookup order
 
-The original plan's `SnapshotConnector` looked for a `.png` cache
-(`modLibrary.CachePhotoPath`'s default extension) and, failing that, fell
-back to copying the shape directly off the library's `Photos` sheet via
-`Shape.Copy`/`Worksheet.Paste`. Manual verification
-(`docs/superpowers/plans/phase-2-manual-verification.md`, 2c) found Add
-Connector never actually showed a photo on `_Snapshot`: 2b's
-`frmConnectorEditor.cmdSave_Click` writes its preview cache as `.jpg`
-(`modEditorActions.PhotoCacheRefreshTarget`), not `.png` - same folder,
-different filename - so `SnapshotConnector`'s `.png` lookup never found it
-and always fell through to the unreliable clipboard-based fallback.
+`SnapshotConnector` (`src/vba/modSnapshot.bas:39-62`, calling `modLibrary.
+CachePhotoPath` and `modLibrary.ExportShapeToFile`) checks in this order:
 
-The shipped `SnapshotConnector` (`src/vba/modSnapshot.bas:39-62`, calling
-`modLibrary.CachePhotoPath` and `modLibrary.ExportShapeToFile`) now checks
-in this order:
-
-1. The `.jpg` cache (`CachePhotoPath(..., "jpg")`) - the reliable, plain-file
-   path 2b's Save actually writes to on every successful save.
-2. The `.png` cache - kept for a connector saved before the jpg cache
-   existed.
+1. The `.jpg` cache (`CachePhotoPath(..., "jpg")`) - the cache the
+   connector editor's Save always writes on a successful save, so this is
+   the reliable, plain-file path for any connector saved through the
+   editor.
+2. The `.png` cache - the extension used before the `.jpg` cache existed;
+   kept so an older connector still finds its photo.
 3. `modLibrary.ExportShapeToFile` against the library's embedded `Shape` -
-   the clipboard-dependent Shape-Copy/Chart-Paste mechanism, documented (2a
-   doc) as unreliable for VBA-triggered operations on this machine, kept
-   only as a last resort for older data with no cache file at all.
+   the clipboard-dependent Shape-Copy/Chart-Paste mechanism
+   (`05_library_core.md`), unreliable for VBA-triggered operations on this
+   machine, used only as a last resort when neither cache file exists.
 
 `tests/test_snapshot.py`'s
 `test_snapshot_connector_prefers_the_jpg_cache_over_reexporting_the_shape`
@@ -95,15 +86,15 @@ directly on the `Connectors` sheet rather than through the editor. Only
 after that does it check whether this specific edit is a rename at all
 (single cell, column A, matching the cached row, a real value change), and
 if so delegates to `modConnectors.RenameRefDes`. `ApplyConnectorEdit`
-returns a `modContract`
-result (`RENAMED` with the new ref des as payload, `RENAME_REJECTED` with
-the reverted value as payload, or `NO_RENAME` for anything else), and the
-adapter (`Worksheet_Change`) only ever branches on that outcome - reverting
-the cell on `RENAME_REJECTED`, updating its own cache on `RENAMED`. This is
-a departure worth noting from the strict layer split: `modConnectors` is a
-layer 0 module (`docs/design/01_architecture_overview.md`) that here
-returns a layer-1-shaped `modContract` envelope, and the adapter calls it
-directly rather than through a layer 1 action module -
+returns a `modContract` result (`RENAMED` with the new ref des as payload,
+`RENAME_REJECTED` with the reverted value as payload, or `NO_RENAME` for
+anything else), and the adapter (`Worksheet_Change`) only ever branches on
+that outcome - reverting the cell on `RENAME_REJECTED`, updating its own
+cache on `RENAMED`. This is a departure worth noting from the strict layer
+split: `modConnectors` is a layer 0 module
+(`docs/design/01_architecture_overview.md`) that here returns a
+layer-1-shaped `modContract` envelope, and the adapter calls it directly
+rather than through a layer 1 action module -
 `docs/design/04_enforcement.md`'s allowlist explicitly permits this
 (`"shConnectors": {"modConnectors.CONN_FIRST_ROW", "modConnectors.
 ApplyConnectorEdit"}`, `tests/test_layering.py:40`) because renaming is
@@ -119,7 +110,7 @@ case - more than one means a different row already used that value.
 
 ### The picker/browser split
 
-Two forms, one function each button click delegates to:
+Three forms, one function each button click delegates to:
 
 - **`frmConnectorPicker`** ("Add Connector"): pick an existing library part,
   or define a new one. `cmdAdd_Click` calls `modPickerActions.AddFromLibrary`
@@ -127,11 +118,20 @@ Two forms, one function each button click delegates to:
   ref des (`modConnectors.AddConnectorInstance`) and freezes the definition
   (`modSnapshot.SnapshotConnector`).
 - **`frmManageLibrary`** ("Manage Library"): edit, delete, import, and
-  export library connectors (import/export are 2d, see that doc).
-  `cmdDelete_Click` calls `modManageActions.DeleteFromLibrary`.
+  export library connectors (import/export are covered in
+  `08_import_export.md`). `cmdDelete_Click` calls `modManageActions.
+  DeleteFromLibrary`.
 - **`frmRemoveConnector`** ("Remove Connector"): drops one placed instance
-  from the current harness. `cmdRemove_Click` calls
+  from the current harness, presenting every placed instance as a list
+  (`modConnectors.InstanceIndex`) for a consistent picker experience with
+  Add Connector and Manage Library. `cmdRemove_Click` calls
   `modConnectorActions.RemoveInstance`.
+
+`modLibrary.ConnectorIndex` and `modConnectors.InstanceIndex`
+(`src/vba/modConnectors.bas:135-161`) supply both forms' and the picker's
+list-box display strings from a single tested source, per `docs/design/
+02_layering_rules.md`'s user-visible-text rule, rather than any form
+assembling `"<ID> - <Name>"` text inline.
 
 `docs/design/04_enforcement.md` names the test that holds this invariant:
 `test_every_click_handler_delegates` fails if any `cmdXxx_Click` on
@@ -156,41 +156,22 @@ ReadConnector", "modLibrary.LIB_ROW_CAP", "modPinEditor.LoadScratchPins",
 handing off pre-loaded state to another form is not itself a transaction
 with a pass/fail outcome to wrap in a `modContract` result. `Load`
 (not `Show`) is called first so `frmConnectorEditor.LoadForEdit` can
-populate the form before it becomes visible - showing it first, then
-unloading `frmManageLibrary`, was found by manual verification to matter:
-unloading `frmManageLibrary` before the editor was shown discarded
-everything `LoadForEdit` had just written.
+populate the form before it becomes visible - showing the editor first,
+then unloading `frmManageLibrary` only afterward, matters: unloading
+`frmManageLibrary` before the editor is shown discards everything
+`LoadForEdit` had just written.
 
-#### Deviations from the original 2c plan
+### `cmdNew_Click`: defining and adding a connector in one flow
 
-The original plan had each form talk to `modLibrary`/`modConnectors`/
-`modSnapshot` directly from its click handlers - there was no
-`modPickerActions`, `modManageActions`, or `modConnectorActions` module,
-and no `frmRemoveConnector` (Remove Connector was a bare `InputBox`). All
-three action modules, and the `frmRemoveConnector` picker replacing the
-`InputBox`, are products of the later UI/logic-separation work, not gaps in
-2c's original scope - they exist so every one of these clicks is reachable
-and asserted via `Application.Run` rather than only reachable by manually
-clicking a form. `modLibrary.ConnectorIndex` and
-`modConnectors.InstanceIndex` (`src/vba/modConnectors.bas:135-161`) supply
-both forms' and the picker's list-box display strings from a single tested
-source, per `docs/design/02_layering_rules.md`'s user-visible-text rule,
-rather than assembling `"<ID> - <Name>"` text inline in a form as the
-original plan's `RefreshList` did.
-
-#### `cmdNew_Click`: the worked exception for handler lifecycle
-
-The original plan's `frmConnectorPicker.cmdNew_Click` closed the library,
-unloaded itself, and showed `frmConnectorEditor` - but never actually added
-an instance of the newly-defined connector to the harness. The shipped
-version fixes this by having `frmConnectorEditor.cmdSave_Click` record the
-just-saved ID in a standard module variable,
-`modConnectorUI.LastSavedConnectorID` (`src/vba/modConnectorUI.bas:12`),
-rather than a property on the form itself. `cmdNew_Click`
-(`src/vba/forms/frmConnectorPicker.evt:55-79`) clears that variable, shows
-`frmConnectorEditor` modally, and - only after `Show` returns, meaning the
-editor has already unloaded itself - reads the variable back and calls
-`AddFromLibrary` if it's non-blank.
+`frmConnectorPicker.cmdNew_Click` (`src/vba/forms/frmConnectorPicker.
+evt:55-79`) handles defining a brand-new connector and adding it to the
+current harness as a single flow. It clears
+`modConnectorUI.LastSavedConnectorID` (`src/vba/modConnectorUI.bas:12`) - a
+standard module variable, not a property on the form itself - then shows
+`frmConnectorEditor` modally. `frmConnectorEditor.cmdSave_Click` sets that
+variable on a successful save. Only after `Show` returns, meaning the
+editor has already unloaded itself, does `cmdNew_Click` read the variable
+back and call `AddFromLibrary` if a connector was actually saved.
 
 This is `docs/design/03_handler_lifecycle.md`'s documented worked
 exception: reading `LastSavedConnectorID` *after* the editor form has
@@ -198,13 +179,3 @@ unloaded is safe only because the value lives in a standard module. A
 property on the form instance would have been reset (or the read would
 risk re-triggering `UserForm_Initialize` on the predeclared instance)
 by the time `cmdNew_Click` resumes after `Show` returns.
-
-### Summary of deviations from the 2c plan
-
-| Plan said | Code does | Why |
-|---|---|---|
-| Forms call `modLibrary`/`modConnectors`/`modSnapshot` directly | `modPickerActions`, `modManageActions`, `modConnectorActions` layer 1 modules mediate every click | UI/logic-separation: every action reachable and tested via `Application.Run` |
-| Remove Connector is an `InputBox` prompt | `frmRemoveConnector` list-picker form, backed by `modConnectors.InstanceIndex` | Consistent picker UX with Add Connector / Manage Library; testable list rendering |
-| `cmdNew_Click` shows the editor and unloads, with no follow-up | Reads `modConnectorUI.LastSavedConnectorID` after `Show` returns and calls `AddFromLibrary` | The original flow never added the newly-created connector to the harness at all |
-| `SnapshotConnector` looks for a `.png` photo cache, else re-exports the Shape | Checks `.jpg` cache first, then `.png`, then re-export as a last resort | 2b's Save writes a `.jpg` cache; the `.png`-only lookup never found it, silently losing the photo on every Add Connector (manual verification finding) |
-| `cmdDelete_Click` deletes the library rows and photo, nothing else | `modManageActions.DeleteFromLibrary` also deletes the on-disk photo cache and cascades to remove every harness instance of that connector | An orphaned cache file and dangling harness instances referencing a deleted ConnectorID were both real gaps once cascading was considered |
