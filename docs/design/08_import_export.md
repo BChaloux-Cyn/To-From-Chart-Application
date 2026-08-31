@@ -1,15 +1,12 @@
-# Phase 2d: Library Import and Export - Design
+## Library Import and Export
 
-Date: 2026-08-26
-Status: Reflects merged code as of Phase 2e
-
-## Purpose
+### Purpose
 
 Moves one connector's full definition - record, pins, and photo - between
 two library-schema workbooks, so a connector one student defines can be
 merged into another's library.
 
-## Collision-safe rename became overwrite-with-confirmation
+### Collision-safe rename became overwrite-with-confirmation
 
 The original 2d plan had `modLibraryTransfer.ImportConnector` call
 `modLibrary.UniqueConnectorID` and silently rename a colliding import to
@@ -36,7 +33,7 @@ leave two similarly-named entries a student has to sort out later.
 (`modLibraryTransfer.bas:53`), so an overwritten connector's provenance is
 still visible afterward.
 
-## Overwrite's ripple effect: cascading instance removal
+### Overwrite's ripple effect: cascading instance removal
 
 `modManageActions.ImportOneConnector`
 (`src/vba/modManageActions.bas:53-79`) wraps `ImportConnector` with a check
@@ -50,7 +47,7 @@ library deletion, 2c doc) to remove every affected chart instance, folding
 the removed ref designators into a `CONNECTOR_IMPORTED_CASCADED` outcome so
 the UI can report exactly what was removed.
 
-## Reporting through `modContract` and `modMessages`
+### Reporting through `modContract` and `modMessages`
 
 Every user-facing outcome of an import or export - `EXPORTED`,
 `EXPORT_FAILED`, `CONNECTOR_IMPORTED`, `CONNECTOR_IMPORTED_CASCADED`,
@@ -65,7 +62,7 @@ cascaded removals - via `modMessages.ImportSummaryMessage`
 (`src/vba/forms/frmManageLibrary.evt:164-168`), rather than one message box
 per connector in the source file.
 
-## `Export Library`: exporting every connector at once
+### `Export Library`: exporting every connector at once
 
 Not present in the original 2d plan at all, which scoped export to one
 connector selected in the list (its own self-review explicitly named
@@ -79,7 +76,7 @@ button, `cmdExportLibrary_Click`, calling
 reporting a `LIBRARY_EXPORTED` outcome carrying the count actually
 exported.
 
-## `CopyConnectorPhoto`'s clipboard mechanism and its reliability
+### `CopyConnectorPhoto`'s clipboard mechanism and its reliability
 
 `modLibraryTransfer.CopyConnectorPhoto`
 (`src/vba/modLibraryTransfer.bas:4-15`) is the one place in this codebase
@@ -125,7 +122,7 @@ image file only when that check fails
 (`src/vba/forms/frmManageLibrary.evt:183-194`), matching the spec's
 "prompts for the image file rather than failing outright" line verbatim.
 
-## Summary of deviations from the 2d plan
+### Summary of deviations from the 2d plan
 
 | Plan said | Code does | Why |
 |---|---|---|

@@ -1,16 +1,13 @@
-# Phase 2b: Connector Editor - Design
+## Connector Editor
 
-Date: 2026-08-26
-Status: Reflects merged code as of Phase 2e
-
-## Purpose
+### Purpose
 
 The connector editor is where a student defines or edits one connector:
 its fields, its photo, and click-to-place pin markers with independently
 movable anchor and marker positions. It is a UserForm, `frmConnectorEditor`,
 opened from Manage Library (2c).
 
-## Why the form is built in code, not a static `.frm`
+### Why the form is built in code, not a static `.frm`
 
 `pytest` drives Excel over COM, which cannot open a Visual Basic IDE
 project file directly, and a `.frm`/`.frx` pair is binary-ish and painful to
@@ -23,7 +20,7 @@ props)` tuples) programmatically. There is no source file for the form's
 visual layout other than this Python module - the same "build from text
 source" principle the sheets and VBA modules follow.
 
-## The three-way split
+### The three-way split
 
 The UI/logic-separation work (`docs/design/01_architecture_overview.md`)
 restructured this subsystem's original single-form design into three
@@ -38,7 +35,12 @@ pieces. What was originally one form's code-behind is now:
   exact inverses of each other) and `PinGeometry`
   (`src/vba/modPinEditor.bas:153-164`), all pixel/normalized-coordinate
   conversions the adapter and `clsPinMarker` need but that stay pure enough
-  to unit test directly.
+  to unit test directly. It also still holds `SaveConnector`
+  (`src/vba/modPinEditor.bas:211-238`), the original 2b plan's function that
+  embeds the photo and writes the connector record and its pins as one
+  transaction - this predates the layer split and was left in place rather
+  than relocated, since it operates only on `Worksheet`/`Range`/scalar
+  arguments like every other layer 0 function here.
 - **`modEditorActions.bas` (layer 1 actions).** Every decision a click or
   button represents: the photo guard (`CanLoadPhoto`), the cache source
   decision (`PhotoSourceForEdit`), and the click/place/delete/pin-number
@@ -62,7 +64,7 @@ handler converts pixels to a normalized point and stores it. Both are layer
 0 primitives with their own tests; there is no transaction here to lift"
 (`tests/test_layering.py:35-38`).
 
-## The `_Edit` scratch sheet
+### The `_Edit` scratch sheet
 
 In-progress pin edits for whichever connector is currently open live on a
 dedicated very-hidden sheet, `_Edit` (code name `shEdit`), rather than an
@@ -81,7 +83,7 @@ keeping a parallel in-memory list, which is what let the original design's
 sheet - be retired (`tests/test_editor_actions.py:63-73`,
 `test_pin_list_items_survives_a_deleted_middle_pin`).
 
-## The anchor-versus-marker distinction
+### The anchor-versus-marker distinction
 
 Every pin carries two independent normalized positions: the anchor
 (`NormX`/`NormY`, the cavity on the connector face) and the marker
@@ -105,7 +107,21 @@ the spec's render-time leader rule (based on the rendered oval's actual
 pixel radius against final photo size) - that geometry exists only once a
 harness is rendered, which this editor never does.
 
-## `clsPinMarker`: one `WithEvents` instance per marker
+**No leader line is drawn in the editor today.** `NeedsLeaderLine`
+(`src/vba/modPinEditor.bas:137-148`) computes correctly and is unit tested
+(`tests/test_pin_editor_movement.py:69-72`), but nothing in
+`frmConnectorEditor.evt` or `clsPinMarker` ever calls it - a marker dragged
+away from its anchor gives no visual indication of that in the editor's own
+preview. Manual verification
+(`docs/superpowers/plans/phase-2-manual-verification.md`) found the natural
+implementation, an `MSForms.Line` control, unavailable on this machine (not
+registered at all, not just a typing issue) and deferred the visual by
+deliberate decision rather than chasing a GDI-based alternative. This is a
+known, accepted gap, not an oversight: the underlying data
+(`PinGeometry`/`NeedsLeaderLine`) is correct and ready for whichever
+rendering approach eventually replaces `MSForms.Line`.
+
+### `clsPinMarker`: one `WithEvents` instance per marker
 
 A VBA form cannot statically declare `WithEvents` for N runtime-created
 controls - `WithEvents` only works on a variable declared at compile time,
@@ -119,7 +135,7 @@ offset), `MouseMove` while the button is held (reposition the label),
 `MouseUp` (convert the label's final pixel position back to a normalized
 point via `NormFromMarker` and commit it with `modPinEditor.MoveMarker`).
 
-## The deliberate limitation: `mConnectorID` is fixed at photo-load time
+### The deliberate limitation: `mConnectorID` is fixed at photo-load time
 
 `mConnectorID` is computed once, in `cmdLoadPhoto_Click`
 (`src/vba/forms/frmConnectorEditor.evt:121-138`), from whatever Name and
@@ -134,7 +150,7 @@ after the fact. This mirrors the spec's own precedent for a similar rough
 edge (static callout markers discarded on manual harness edits): a
 documented limitation given the natural fill-in order, not a bug.
 
-## Photo caching, backfill, and the JPG-only restriction
+### Photo caching, backfill, and the JPG-only restriction
 
 The original 2b plan's photo picker offered PNG, JPG, and BMP via
 `LoadPicture`. The shipped `modEditorActions.PhotoFileFilter`
@@ -160,14 +176,18 @@ machine. A successful Save always refreshes the cache going forward
 `src/vba/modEditorActions.bas:20-31`, called from `cmdSave_Click`), so the
 backfill path only matters for a connector saved before caching existed.
 
-## Save: ID collision guard and the result envelope
+### Save: ID collision guard and the result envelope
 
 `modEditorActions.SaveFromEditor`
-(`src/vba/modEditorActions.bas:218-247`) is the whole save transaction bar
-the workbook open/close and the post-save photo-cache copy, which stay in
-the adapter per `docs/design/02_layering_rules.md`. It was not in the
-original 2b plan's `SaveConnector` signature: the original had no
-collision check at all. The shipped version takes both the connector's
+(`src/vba/modEditorActions.bas:218-247`) wraps the save transaction bar the
+workbook open/close and the post-save photo-cache copy, which stay in the
+adapter per `docs/design/02_layering_rules.md` - but the multi-table write
+itself (embed photo, write the connector row, delete and rewrite its pins)
+is still `modPinEditor.SaveConnector`, called once at
+`modEditorActions.bas:234`. What `SaveFromEditor` actually *adds* on top of
+that unchanged layer 0 function is the ID-collision check: the original 2b
+plan's `SaveConnector` had no collision check at all. The shipped version
+takes both the connector's
 current (possibly just-edited) ID and its `sOriginalID` (blank for a new
 connector), and rejects the save with `ID_COLLISION` only when the
 candidate ID already names a *different* row than the one this session
@@ -186,7 +206,7 @@ modMessages.MessageFor(vResult), modMessages.MessageStyleFor(vResult)`
 appears wherever a non-silent outcome needs reporting
 (`src/vba/forms/frmConnectorEditor.evt:127-130`, `:258-260`).
 
-## `NextPinNumber`: gap-filling instead of a running counter
+### `NextPinNumber`: gap-filling instead of a running counter
 
 The original plan's form tracked `mNextPinNumber`, a simple incrementing
 counter. The shipped `modEditorActions.NextPinNumber`
@@ -199,7 +219,7 @@ pins running past its declared `PinCount`
 another piece of form-local state that could previously desync from the
 sheet.
 
-## Summary of deviations from the 2b plan
+### Summary of deviations from the 2b plan
 
 | Plan said | Code does | Why |
 |---|---|---|

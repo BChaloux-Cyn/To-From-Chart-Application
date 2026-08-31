@@ -1,9 +1,6 @@
-# Phase 2a: Connector Library Core - Design
+## Connector Library Core
 
-Date: 2026-08-26
-Status: Reflects merged code as of Phase 2e
-
-## Purpose
+### Purpose
 
 Every connector a student defines lives in one shared, macro-free file,
 `dist/ConnectorLibrary.xlsx`, so a part is defined once and reused across
@@ -19,7 +16,7 @@ dialogs. That split was added after this subsystem was built; this doc
 covers the schema and storage conventions that sit underneath it and are
 unaffected by it.
 
-## The three-table schema
+### The three-table schema
 
 `build/library_layout.py:11` defines the sheet order - `Connectors`,
 `Pins`, `Photos` - built by `build_library_sheets` and used unmodified by
@@ -57,7 +54,7 @@ One reader and one writer serve all three because every `modLibrary`
 function takes its target range as an explicit window rather than assuming
 a dedicated sheet - see below.
 
-## The bounded-window convention
+### The bounded-window convention
 
 Every CRUD function in `modLibrary.bas` takes `nFirstRow` and `nLastRow` as
 explicit parameters (e.g. `WriteConnector(wsConn, nFirstRow, nLastRow,
@@ -80,7 +77,7 @@ compacts in a single pass, copying every non-matching row down to a write
 cursor and clearing the leftover tail. Both stay strictly inside
 `[nFirstRow, nLastRow]`.
 
-### `LastUsedRowInWindow` and its bug
+#### `LastUsedRowInWindow` and its bug
 
 `src/vba/modLibrary.bas:44-60` is `Public` (not `Private`) because
 `modPinEditor` (2b) reuses it for the same bounded-window-safe delete it
@@ -101,7 +98,7 @@ library_connectors.py` and `tests/test_library_pins.py` both include a
 boundary test for this (`test_write_respects_the_row_window`, `test_delete_
 stays_inside_its_row_window` and their `Pins` counterparts).
 
-## The field-order-array convention
+### The field-order-array convention
 
 No VBA `Type` crosses the `Application.Run` boundary pytest uses to call
 these functions directly - a custom `Type` cannot be marshaled across that
@@ -114,7 +111,7 @@ this with a field-count check (`UBound(vFields) - LBound(vFields) + 1 <>
 LIB_FIELD_COUNT`) before touching the sheet, rejecting a malformed array
 rather than writing a partial row.
 
-## Photo grid and cache path
+### Photo grid and cache path
 
 `Photos` holds one embedded picture shape per connector, named
 `PHOTO_<ConnectorID>` and laid out in a fixed grid
@@ -134,7 +131,7 @@ harness-chart cache uses the `"png"` default. This parameter did not exist
 in the original 2a plan; it was added once 2b needed a second, differently-
 constrained cache consumer.
 
-### A behavior added after the original plan: keep the existing photo on an empty path
+#### A behavior added after the original plan: keep the existing photo on an empty path
 
 The original plan had `EmbedConnectorPhoto` return `""` whenever
 `sImagePath` did not exist on disk. Manual verification of 2c
@@ -153,7 +150,7 @@ returns `""` (`src/vba/modLibrary.bas:319-331`, tested by
 `test_embed_photo_with_no_new_path_keeps_the_existing_one` in `tests/
 test_library_photos.py:26-42`).
 
-## `ConnectorIndex`: the browsable list, rendered here
+### `ConnectorIndex`: the browsable list, rendered here
 
 `ConnectorIndex(wsConn)` (`src/vba/modLibrary.bas:119-145`) was not part of
 the original 2a plan - it was added so the picker and manage-library forms
@@ -168,7 +165,7 @@ it scans the whole sheet (`Cells(Rows.Count, ...).End(xlUp)`,
 is only ever called against the dedicated whole-sheet library, never
 against a shared sheet like `_Snapshot`.
 
-## `ExportShapeToFile`: exporting a shape from a very-hidden sheet
+### `ExportShapeToFile`: exporting a shape from a very-hidden sheet
 
 Also absent from the original 2a plan. Excel has no direct "export a Shape
 to an image file" call; `ExportShapeToFile`
@@ -203,7 +200,7 @@ activation dance) rather than asserting a live Copy/Paste actually lands,
 since a live assertion would not be any more reliable in CI than it was by
 hand.
 
-## Summary of deviations from the 2a plan
+### Summary of deviations from the 2a plan
 
 | Plan said | Code does | Why |
 |---|---|---|

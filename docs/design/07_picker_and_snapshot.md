@@ -1,9 +1,6 @@
-# Phase 2c: Connector Picker, Snapshot, and Ref Des Rename - Design
+## Connector Picker, Snapshot, and Ref Des Rename
 
-Date: 2026-08-26
-Status: Reflects merged code as of Phase 2e
-
-## Purpose
+### Purpose
 
 This subsystem wires the library (2a) and the connector editor (2b) into
 the Creator's actual workflow: Add Connector picks a library part (or
@@ -12,7 +9,7 @@ Library browses, edits, and deletes library entries; Remove Connector
 drops a placed instance; and ref des rename rewrites every chart reference
 and rejects collisions.
 
-## `_Snapshot`'s three fixed regions
+### `_Snapshot`'s three fixed regions
 
 `_Snapshot` (very hidden, code name `shSnapshot`) holds three regions on
 one physical sheet, all sized in `build/layout.py`:
@@ -31,7 +28,7 @@ independent tables - and because `modLibrary`'s bounded-window functions
 actually uses (a handful of connectors) while staying a small, fixed cost
 on a sheet nobody scrolls through by hand.
 
-## `SnapshotConnector`'s idempotency
+### `SnapshotConnector`'s idempotency
 
 `modSnapshot.SnapshotConnector` (`src/vba/modSnapshot.bas:13-69`) is frozen
 once per distinct ConnectorID, not per ref des instance: it checks
@@ -43,7 +40,7 @@ Connector` call is a no-op against `_Snapshot`, even though it still
 allocates its own ref des and its own `Connectors`-sheet instance row via
 `modConnectors.AddConnectorInstance`.
 
-### The photo-cache lookup: a real bug found and fixed
+#### The photo-cache lookup: a real bug found and fixed
 
 The original plan's `SnapshotConnector` looked for a `.png` cache
 (`modLibrary.CachePhotoPath`'s default extension) and, failing that, fell
@@ -56,8 +53,9 @@ Connector never actually showed a photo on `_Snapshot`: 2b's
 different filename - so `SnapshotConnector`'s `.png` lookup never found it
 and always fell through to the unreliable clipboard-based fallback.
 
-The shipped `SnapshotConnector` (`src/vba/modLibrary.bas` fallback chain,
-`src/vba/modSnapshot.bas:39-62`) now checks in this order:
+The shipped `SnapshotConnector` (`src/vba/modSnapshot.bas:39-62`, calling
+`modLibrary.CachePhotoPath` and `modLibrary.ExportShapeToFile`) now checks
+in this order:
 
 1. The `.jpg` cache (`CachePhotoPath(..., "jpg")`) - the reliable, plain-file
    path 2b's Save actually writes to on every successful save.
@@ -73,7 +71,7 @@ The shipped `SnapshotConnector` (`src/vba/modLibrary.bas` fallback chain,
 seeds only the `.jpg` cache directly (no clipboard) and asserts
 `SnapshotConnector` finds and uses it rather than falling through.
 
-## The `SelectionChange`-caches-prior-value technique
+### The `SelectionChange`-caches-prior-value technique
 
 A plain `Worksheet_Change` handler only ever sees a cell's *new* value -
 there is no built-in "previous value" to compare against. `shConnectors.evt`
@@ -87,11 +85,17 @@ moved, if compaction from a delete happened concurrently) is tracked by
 row number captured at selection time.
 
 The actual rename decision lives in `modConnectors.ApplyConnectorEdit`
-(`src/vba/modConnectors.bas:256-286`), not in the sheet module itself:
-it takes the target range plus the cached prior ref des and row, decides
-whether this edit is a rename at all (single cell, column A, matching the
-cached row, a real value change), and if so delegates to
-`modConnectors.RenameRefDes`. `ApplyConnectorEdit` returns a `modContract`
+(`src/vba/modConnectors.bas:256-286`), not in the sheet module itself, and
+it does two things on every `Connectors`-sheet edit, not just a rename:
+before any rename logic runs at all, it calls
+`modChart.RefreshChartRowsForConnector` for every edited row
+(`src/vba/modConnectors.bas:262-267`) - this is what keeps a chart row's
+From/To Pin dropdown in sync when, say, a connector's Pin Count is edited
+directly on the `Connectors` sheet rather than through the editor. Only
+after that does it check whether this specific edit is a rename at all
+(single cell, column A, matching the cached row, a real value change), and
+if so delegates to `modConnectors.RenameRefDes`. `ApplyConnectorEdit`
+returns a `modContract`
 result (`RENAMED` with the new ref des as payload, `RENAME_REJECTED` with
 the reverted value as payload, or `NO_RENAME` for anything else), and the
 adapter (`Worksheet_Change`) only ever branches on that outcome - reverting
@@ -113,7 +117,7 @@ by the time this runs, the renamed row already carries the new ref des, so
 exactly one match across the whole `Connectors` sheet is the non-colliding
 case - more than one means a different row already used that value.
 
-## The picker/browser split
+### The picker/browser split
 
 Two forms, one function each button click delegates to:
 
@@ -137,7 +141,27 @@ action module (`modPickerActions`, `modManageActions`, `modEditorActions`,
 or - for the ref-des-rename exception above - the allowlisted
 `modConnectors.ApplyConnectorEdit`).
 
-### Deviations from the original 2c plan
+**`frmManageLibrary.cmdEdit_Click` is exempted from this check entirely** -
+`NON_DELEGATING_HANDLERS` (`tests/test_layering.py:45`) lists it alongside
+`cmdCancel_Click`/`cmdClose_Click` because its job is to hand off to
+`frmConnectorEditor`, not to make its own domain decision. It reads the
+selected connector's fields directly (`modLibrary.ReadConnector`), seeds
+the `_Edit` scratch sheet directly (`modPinEditor.LoadScratchPins`), then
+loads and shows `frmConnectorEditor` before unloading itself
+(`src/vba/forms/frmManageLibrary.evt:39-60`) - both direct layer 0 calls
+are allow-listed for this adapter specifically
+(`"frmManageLibrary": {"modLibrary.ConnectorIndex", "modLibrary.
+ReadConnector", "modLibrary.LIB_ROW_CAP", "modPinEditor.LoadScratchPins",
+"modLibrary.FindConnectorRow"}`, `tests/test_layering.py:30-34`), because
+handing off pre-loaded state to another form is not itself a transaction
+with a pass/fail outcome to wrap in a `modContract` result. `Load`
+(not `Show`) is called first so `frmConnectorEditor.LoadForEdit` can
+populate the form before it becomes visible - showing it first, then
+unloading `frmManageLibrary`, was found by manual verification to matter:
+unloading `frmManageLibrary` before the editor was shown discarded
+everything `LoadForEdit` had just written.
+
+#### Deviations from the original 2c plan
 
 The original plan had each form talk to `modLibrary`/`modConnectors`/
 `modSnapshot` directly from its click handlers - there was no
@@ -154,7 +178,7 @@ source, per `docs/design/02_layering_rules.md`'s user-visible-text rule,
 rather than assembling `"<ID> - <Name>"` text inline in a form as the
 original plan's `RefreshList` did.
 
-### `cmdNew_Click`: the worked exception for handler lifecycle
+#### `cmdNew_Click`: the worked exception for handler lifecycle
 
 The original plan's `frmConnectorPicker.cmdNew_Click` closed the library,
 unloaded itself, and showed `frmConnectorEditor` - but never actually added
@@ -175,7 +199,7 @@ property on the form instance would have been reset (or the read would
 risk re-triggering `UserForm_Initialize` on the predeclared instance)
 by the time `cmdNew_Click` resumes after `Show` returns.
 
-## Summary of deviations from the 2c plan
+### Summary of deviations from the 2c plan
 
 | Plan said | Code does | Why |
 |---|---|---|

@@ -47,8 +47,8 @@ are lost on the next build.
 | `src/vba/mod*Actions.bas` | User-intent transactions; the only thing forms may call |
 | `src/vba/` | Layer 0 primitives; `sheets/*.evt` and `forms/*.evt` are UI adapters |
 | `tests/` | pytest suites driving Excel COM |
-| `docs/design/` | Layering strategy reference |
-| `docs/superpowers/specs/` | Design spec |
+| `docs/design/` | Current-state design documentation: layering strategy plus every subsystem |
+| `docs/superpowers/specs/` | Original design spec |
 | `docs/superpowers/plans/` | Implementation plans |
 
 ## Status
@@ -57,8 +57,8 @@ Phase 1 complete: build system, Creator shell, to-from chart with dependent
 pin dropdowns. Phase 2 complete: connector library file and reader/writer,
 the connector editor with click-to-place pin markers, the connector picker,
 per-harness connector snapshots, ref des rename, and library import/export.
-See `docs/user-guide/user-guide.md` for how to use what's built so far, the
-`docs/superpowers/specs/` design docs for each subsystem's decisions, and
-`docs/design/` for the layering rules the code follows day to day. Phases 3
-and 4 (harness save/load with rendered connector pages, validation and
-export) are specified but not yet built.
+See `docs/user-guide/user-guide.md` for how to use what's built so far, and
+`docs/design/` for how the Creator is built - each subsystem's decisions
+alongside the layering rules the code follows day to day. Phases 3 and 4
+(harness save/load with rendered connector pages, validation and export)
+are specified but not yet built.
