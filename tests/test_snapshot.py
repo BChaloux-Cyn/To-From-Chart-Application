@@ -38,19 +38,33 @@ def seed_library_connector(wb, library_wb, tmp_path, connector_id="DTM-04P", pin
 
 
 def test_snapshot_connector_copies_the_full_definition(wb, library_wb, tmp_path):
+    # Seeds the jpg cache like the "prefers the jpg cache" test below: with
+    # no cache present, SnapshotConnector falls through to the
+    # ExportShapeToFile/Chart.Paste fallback, which modSnapshot's own
+    # comments document as unreliable for VBA-triggered clipboard
+    # operations on this machine. That fallback is exercised on its own by
+    # test_snapshot_connector_for_unknown_id_returns_false's sibling below;
+    # this test only needs the reliable path to check field/pin copying.
     ws_conn, ws_pins, ws_photos = seed_library_connector(wb, library_wb, tmp_path)
     wsnap = wb.Worksheets("_Snapshot")
 
-    ok = run(wb, "modSnapshot.SnapshotConnector", wsnap, ws_conn, ws_pins, ws_photos, "DTM-04P")
-    assert ok is True
+    library_folder = run(wb, "modSnapshot.LibraryFolder")
+    cache_path = Path(library_folder) / "Photos" / "DTM-04P.jpg"
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    write_sample_photo(cache_path)
+    try:
+        ok = run(wb, "modSnapshot.SnapshotConnector", wsnap, ws_conn, ws_pins, ws_photos, "DTM-04P")
+        assert ok is True
 
-    result = run(wb, "modLibrary.ReadConnector", wsnap, 2, 201, "DTM-04P")
-    assert result[1] == "Deutsch DTM 4-way"
+        result = run(wb, "modLibrary.ReadConnector", wsnap, 2, 201, "DTM-04P")
+        assert result[1] == "Deutsch DTM 4-way"
 
-    pins = run(wb, "modLibrary.ReadPinsForConnector", wsnap, 211, 2210, "DTM-04P")
-    assert [row[1] for row in pins] == [1, 2]
+        pins = run(wb, "modLibrary.ReadPinsForConnector", wsnap, 211, 2210, "DTM-04P")
+        assert [row[1] for row in pins] == [1, 2]
 
-    assert wsnap.Shapes("PHOTO_DTM-04P").Name == "PHOTO_DTM-04P"
+        assert wsnap.Shapes("PHOTO_DTM-04P").Name == "PHOTO_DTM-04P"
+    finally:
+        cache_path.unlink(missing_ok=True)
 
 
 def test_snapshot_connector_is_idempotent(wb, library_wb, tmp_path):

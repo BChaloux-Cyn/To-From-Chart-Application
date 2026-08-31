@@ -64,8 +64,9 @@ def test_picker_new_chains_into_adding_an_instance_of_what_was_just_saved(wb):
     assert "modConnectorUI.LastSavedConnectorID = \"\"" in body
     assert "modPickerActions.AddFromLibrary" in body
     # Show must come before reading LastSavedConnectorID - it's only set
-    # once frmConnectorEditor's Save actually runs.
-    assert body.index("frmConnectorEditor.Show") < body.index("modConnectorUI.LastSavedConnectorID")
+    # once frmConnectorEditor's Save actually runs. rindex, not index: the
+    # string also appears earlier as the pre-Show clear assignment.
+    assert body.index("frmConnectorEditor.Show") < body.rindex("modConnectorUI.LastSavedConnectorID")
 
 
 def test_connector_editor_save_records_the_saved_id_for_callers(wb):
