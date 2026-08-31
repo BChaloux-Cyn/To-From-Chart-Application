@@ -47,6 +47,7 @@ are lost on the next build.
 | `src/vba/mod*Actions.bas` | User-intent transactions; the only thing forms may call |
 | `src/vba/` | Layer 0 primitives; `sheets/*.evt` and `forms/*.evt` are UI adapters |
 | `tests/` | pytest suites driving Excel COM |
+| `docs/design/` | Layering strategy reference |
 | `docs/superpowers/specs/` | Design spec |
 | `docs/superpowers/plans/` | Implementation plans |
 
