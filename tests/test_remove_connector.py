@@ -1,9 +1,51 @@
-from tests.conftest import run
+from tests.conftest import run, run_action
 
 
 def add(wb, connector_id="DTM-04P"):
     return run(wb, "modConnectors.AddConnectorInstance",
                connector_id, "Deutsch DTM 4-way", "DTM06-4S", "Connector", 4)
+
+
+def test_instance_index_is_empty_with_no_connectors_placed(wb):
+    assert run(wb, "modConnectors.InstanceIndex") is None
+
+
+def test_instance_index_lists_ref_des_and_name(wb):
+    add(wb)  # J1
+    add(wb, "DTM-08P")  # J2
+
+    index = run(wb, "modConnectors.InstanceIndex")
+    assert [row[0] for row in index] == ["J1 - Deutsch DTM 4-way", "J2 - Deutsch DTM 4-way"]
+    assert [row[1] for row in index] == ["J1", "J2"]
+
+
+def test_remove_instance_action_removes_and_reports_the_ref_des(wb):
+    add(wb)  # J1
+    result = run_action(wb, "modConnectorActions.RemoveInstance", "J1")
+    assert (result.ok, result.outcome, result.payload) == (True, "INSTANCE_REMOVED", "J1")
+    assert run(wb, "modConnectors.PinCountFor", "J1") == 0
+
+
+def test_remove_instance_action_reports_an_unknown_ref_des(wb):
+    result = run_action(wb, "modConnectorActions.RemoveInstance", "J99")
+    assert (result.ok, result.outcome, result.payload) == (False, "INSTANCE_NOT_FOUND", "J99")
+
+
+def test_remove_instances_of_type_removes_every_matching_ref_des(wb):
+    add(wb)  # J1, DTM-04P
+    add(wb, "DTM-08P")  # J2
+    add(wb)  # J3, DTM-04P
+
+    removed = run(wb, "modConnectors.RemoveInstancesOfConnectorType", "DTM-04P")
+    assert list(removed) == ["J1", "J3"]
+    assert run(wb, "modConnectors.PinCountFor", "J1") == 0
+    assert run(wb, "modConnectors.PinCountFor", "J2") == 4  # untouched
+    assert run(wb, "modConnectors.PinCountFor", "J3") == 0
+
+
+def test_remove_instances_of_type_is_empty_when_none_are_placed(wb):
+    add(wb, "DTM-08P")  # J1, a different library connector
+    assert run(wb, "modConnectors.RemoveInstancesOfConnectorType", "DTM-04P") is None
 
 
 def test_remove_deletes_the_connector_row(wb):

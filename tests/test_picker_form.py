@@ -15,9 +15,30 @@ def test_picker_has_its_controls(wb, name):
     assert controls(wb, "frmConnectorPicker")(name).Name == name
 
 
-@pytest.mark.parametrize("name", ["lstConnectors", "cmdEdit", "cmdDelete", "cmdImport", "cmdExport", "cmdClose"])
+def test_pin_list_does_not_shrink_when_a_pin_is_placed(wb):
+    # IntegralHeight defaults to True, which silently shrinks a ListBox's
+    # own Height the first time an item is added (rounds down to a whole
+    # number of visible rows) - live testing found this made lstPins look
+    # like it had moved even though its Top never changed.
+    assert controls(wb, "frmConnectorEditor")("lstPins").IntegralHeight is False
+
+
+@pytest.mark.parametrize("name", ["lstConnectors", "cmdEdit", "cmdDelete", "cmdImport",
+                                   "cmdExport", "cmdExportLibrary", "cmdClose"])
 def test_manage_library_has_its_controls(wb, name):
     assert controls(wb, "frmManageLibrary")(name).Name == name
+
+
+@pytest.mark.parametrize("name", ["lstConnectors", "cmdRemove", "cmdCancel"])
+def test_remove_connector_has_its_controls(wb, name):
+    assert controls(wb, "frmRemoveConnector")(name).Name == name
+
+
+def test_remove_connector_delegates_through_the_action_module(wb):
+    source = module_source(wb, "frmRemoveConnector")
+    remove_click = source[source.index("Private Sub cmdRemove_Click"):]
+    body = remove_click.split("End Sub", 1)[0]
+    assert "modConnectorActions.RemoveInstance" in body
 
 
 def test_picker_add_calls_add_connector_instance_and_snapshot(wb):
@@ -106,7 +127,7 @@ def test_manage_library_delete_calls_library_delete_functions(wb):
     assert "modManageActions.DeleteFromLibrary" in body
 
 
-@pytest.mark.parametrize("form_name", ["frmConnectorPicker", "frmManageLibrary"])
+@pytest.mark.parametrize("form_name", ["frmConnectorPicker", "frmManageLibrary", "frmRemoveConnector"])
 def test_controls_fit_within_the_form_width(wb, form_name):
     # Manual verification (phase-2-manual-verification.md, 2c) found
     # frmManageLibrary's form too narrow to show all 5 buttons - Export and

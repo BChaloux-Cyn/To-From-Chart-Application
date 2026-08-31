@@ -73,6 +73,7 @@ Private Sub cmdDelete_Click()
     mLibrary.Save
 
     RefreshList
+    MsgBox modMessages.MessageFor(vResult), modMessages.MessageStyleFor(vResult)
 End Sub
 
 Private Sub cmdExport_Click()
@@ -97,6 +98,26 @@ Private Sub cmdExport_Click()
     MsgBox modMessages.MessageFor(vResult), modMessages.MessageStyleFor(vResult)
 End Sub
 
+Private Sub cmdExportLibrary_Click()
+    Dim sPath As Variant
+    sPath = Application.GetSaveAsFilename( _
+        InitialFileName:="library_export.xlsx", _
+        FileFilter:="Excel Workbook (*.xlsx), *.xlsx")
+    If sPath = False Then Exit Sub
+
+    Dim destWb As Workbook
+    Set destWb = Workbooks.Add
+
+    Dim vResult As Variant
+    vResult = modManageActions.ExportLibraryToWorkbook(mLibrary.Worksheets("Connectors"), _
+        mLibrary.Worksheets("Pins"), mLibrary.Worksheets("Photos"), destWb)
+
+    If modContract.Ok(vResult) Then destWb.SaveAs Filename:=CStr(sPath), FileFormat:=51
+    destWb.Close SaveChanges:=False
+
+    MsgBox modMessages.MessageFor(vResult), modMessages.MessageStyleFor(vResult)
+End Sub
+
 Private Sub cmdImport_Click()
     Dim sPath As Variant
     sPath = Application.GetOpenFilename(FileFilter:="Excel Workbook (*.xlsx), *.xlsx")
@@ -105,31 +126,71 @@ Private Sub cmdImport_Click()
     Dim srcWb As Workbook
     Set srcWb = Workbooks.Open(CStr(sPath))
 
-    Dim vResult As Variant
-    vResult = modManageActions.ImportAllFromWorkbook(srcWb, _
-        mLibrary.Worksheets("Connectors"), mLibrary.Worksheets("Pins"), _
-        mLibrary.Worksheets("Photos"))
-    srcWb.Close SaveChanges:=False
+    Dim vIndex As Variant, n As Long, i As Long, sConnectorID As String, vResult As Variant
+    Dim nImported As Long, nKept As Long, nOverwritten As Long
+    Dim vRemoved() As String, nRemovedCount As Long
 
-    ' Prompt only for the connectors whose photo could not be carried over.
-    Dim vRows As Variant, i As Long, sDestID As String, sReplacement As Variant
-    vRows = modContract.Payload(vResult)
-    For i = 1 To modContract.TableRowCount(vRows)
-        If Not CBool(vRows(i, 2)) Then
-            sDestID = CStr(vRows(i, 1))
-            sReplacement = Application.GetOpenFilename( _
-                "Pictures (*.png; *.jpg; *.jpeg; *.bmp), *.png;*.jpg;*.jpeg;*.bmp", _
-                , "Photo for " & sDestID & " could not be extracted - choose a replacement")
-            If sReplacement <> False Then
-                modManageActions.AttachReplacementPhoto mLibrary.Worksheets("Photos"), _
-                    sDestID, CStr(sReplacement)
+    vIndex = modLibrary.ConnectorIndex(srcWb.Worksheets("Connectors"))
+    n = modContract.TableRowCount(vIndex)
+
+    For i = 1 To n
+        sConnectorID = CStr(vIndex(i, 2))
+
+        If modLibrary.FindConnectorRow(mLibrary.Worksheets("Connectors"), 2, _
+                modLibrary.LIB_ROW_CAP, sConnectorID) > 0 Then
+            If MsgBox("A connector with Part Number '" & sConnectorID & "' already exists " & _
+                    "in the library. Overwrite it with the imported version?", _
+                    vbYesNo + vbQuestion) = vbYes Then
+                vResult = modManageActions.ImportOneConnector(srcWb, mLibrary.Worksheets("Connectors"), _
+                    mLibrary.Worksheets("Pins"), mLibrary.Worksheets("Photos"), sConnectorID, srcWb.Name)
+                nOverwritten = nOverwritten + 1
+                AppendRemoved vRemoved, nRemovedCount, vResult
+                PromptForReplacementPhotoIfNeeded sConnectorID
+            Else
+                nKept = nKept + 1
             End If
+        Else
+            vResult = modManageActions.ImportOneConnector(srcWb, mLibrary.Worksheets("Connectors"), _
+                mLibrary.Worksheets("Pins"), mLibrary.Worksheets("Photos"), sConnectorID, srcWb.Name)
+            nImported = nImported + 1
+            PromptForReplacementPhotoIfNeeded sConnectorID
         End If
     Next i
 
+    srcWb.Close SaveChanges:=False
     mLibrary.Save
     RefreshList
-    MsgBox modMessages.MessageFor(vResult), modMessages.MessageStyleFor(vResult)
+
+    If nRemovedCount > 0 Then
+        MsgBox modMessages.ImportSummaryMessage(nImported, nKept, nOverwritten, vRemoved), vbInformation
+    Else
+        MsgBox modMessages.ImportSummaryMessage(nImported, nKept, nOverwritten, Empty), vbInformation
+    End If
+End Sub
+
+Private Sub AppendRemoved(vRemoved() As String, ByRef nCount As Long, vResult As Variant)
+    If modContract.Outcome(vResult) <> "CONNECTOR_IMPORTED_CASCADED" Then Exit Sub
+
+    Dim vNew As Variant, i As Long
+    vNew = modContract.Payload(vResult)
+    For i = LBound(vNew) To UBound(vNew)
+        nCount = nCount + 1
+        ReDim Preserve vRemoved(1 To nCount)
+        vRemoved(nCount) = CStr(vNew(i))
+    Next i
+End Sub
+
+Private Sub PromptForReplacementPhotoIfNeeded(ByVal sConnectorID As String)
+    If modManageActions.ImportedPhotoOk(mLibrary.Worksheets("Photos"), sConnectorID) Then Exit Sub
+
+    Dim sReplacement As Variant
+    sReplacement = Application.GetOpenFilename( _
+        "Pictures (*.png; *.jpg; *.jpeg; *.bmp), *.png;*.jpg;*.jpeg;*.bmp", _
+        , "Photo for " & sConnectorID & " could not be extracted - choose a replacement")
+    If sReplacement <> False Then
+        modManageActions.AttachReplacementPhoto mLibrary.Worksheets("Photos"), _
+            sConnectorID, CStr(sReplacement)
+    End If
 End Sub
 
 Private Sub cmdClose_Click()

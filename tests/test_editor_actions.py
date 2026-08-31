@@ -79,14 +79,19 @@ def test_pin_list_items_of_an_unplaced_connector_is_empty(wb):
     assert run(wb, "modEditorActions.PinListItems", ws, "NOPE") is None
 
 
-def test_next_pin_number_is_one_past_the_highest(wb):
+def test_next_pin_number_fills_the_lowest_gap(wb):
     ws = wb.Worksheets("_Edit")
     run(wb, "modPinEditor.ClearScratchPins", ws)
-    assert run(wb, "modEditorActions.NextPinNumber", ws, "J1") == 1
+    assert run(wb, "modEditorActions.NextPinNumber", ws, "J1", 8) == 1
 
     write_scratch_pin(wb, ws, "J1", 1, "Pin 1", 0.1, 0.1, 0.1, 0.1)
     write_scratch_pin(wb, ws, "J1", 5, "Pin 5", 0.1, 0.1, 0.1, 0.1)
-    assert run(wb, "modEditorActions.NextPinNumber", ws, "J1") == 6
+    assert run(wb, "modEditorActions.NextPinNumber", ws, "J1", 8) == 2
+
+    for n in (2, 3, 4, 6, 7, 8):
+        write_scratch_pin(wb, ws, "J1", n, f"Pin {n}", 0.1, 0.1, 0.1, 0.1)
+    run(wb, "modPinEditor.RemovePin", ws, "J1", 5)
+    assert run(wb, "modEditorActions.NextPinNumber", ws, "J1", 8) == 5
 
 
 from tests.conftest import run_action
@@ -232,7 +237,7 @@ def test_click_out_of_place_mode_with_nothing_selected_is_a_no_op(wb):
     assert (result.ok, result.outcome) == (False, "NO_OP")
 
 
-def test_pin_numbers_are_not_reused_after_a_deletion(wb):
+def test_a_deleted_pin_number_is_reused_by_the_next_placement(wb):
     ws = wb.Worksheets("_Edit")
     run(wb, "modPinEditor.ClearScratchPins", ws)
     for _ in range(3):
@@ -241,7 +246,7 @@ def test_pin_numbers_are_not_reused_after_a_deletion(wb):
 
     result = run_action(wb, "modEditorActions.PhotoClickAction",
                         ws, "J1", True, 0, "9", 0.4, 0.4)
-    assert result.payload == 4
+    assert result.payload == 2
 
 
 from tests.fixtures.sample_photo import write_sample_photo

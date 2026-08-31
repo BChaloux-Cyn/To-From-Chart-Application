@@ -42,6 +42,27 @@ def test_export_success_and_failure(wb):
     assert message_for(wb, False, "EXPORT_FAILED", "DTM-04P") == "Could not export DTM-04P."
 
 
+def test_library_exported_names_the_count(wb):
+    assert message_for(wb, True, "LIBRARY_EXPORTED", 3) == "Exported 3 connector(s)."
+
+
+def test_connector_deleted_names_the_id(wb):
+    assert message_for(wb, True, "CONNECTOR_DELETED", "DTM-04P") == "Deleted DTM-04P."
+
+
+def test_connector_deleted_cascaded_lists_the_removed_instances(wb):
+    assert message_for(wb, True, "CONNECTOR_DELETED_CASCADED", ("J1", "J2")) == (
+        "Deleted from the library. "
+        "Removed 2 connector instance(s) from the chart: J1, J2."
+    )
+
+
+def test_instance_not_found_names_the_ref_des(wb):
+    assert message_for(wb, False, "INSTANCE_NOT_FOUND", "J99") == (
+        "No connector instance 'J99' found."
+    )
+
+
 def test_silent_outcomes_produce_no_message(wb):
     for outcome in ("PLACED", "MOVED_ANCHOR", "NO_OP", "OK", "NO_RENAME"):
         payload = 1 if outcome in ("PLACED", "MOVED_ANCHOR") else None

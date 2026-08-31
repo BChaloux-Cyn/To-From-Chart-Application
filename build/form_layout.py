@@ -26,7 +26,11 @@ FIELD_CONTROLS = [
     ("Forms.TextBox.1", "txtNotes", 100, 132, 200, 40, {"MultiLine": True}),
     ("Forms.CommandButton.1", "cmdLoadPhoto", 320, 12, 90, 20, {"Caption": "Load Photo"}),
     ("Forms.Image.1", "imgPhoto", 320, 40, 180, 180, {}),
-    ("Forms.ListBox.1", "lstPins", 12, 184, 180, 120, {}),
+    # IntegralHeight defaults to True, which silently shrinks the box's own
+    # Height the first time an item is added (rounding down to a whole
+    # number of visible rows) - here that shrank a 120pt box to ~117pt,
+    # which reads as the list "moving" even though Top never changes.
+    ("Forms.ListBox.1", "lstPins", 12, 184, 180, 120, {"IntegralHeight": False}),
     ("Forms.ToggleButton.1", "tglPlacePins", 200, 184, 100, 20, {"Caption": "Place Pins"}),
     ("Forms.CommandButton.1", "cmdDeletePin", 200, 210, 100, 20, {"Caption": "Delete Pin"}),
     ("Forms.CommandButton.1", "cmdClearPins", 200, 236, 100, 20, {"Caption": "Clear Pins"}),
@@ -81,17 +85,19 @@ PICKER_CONTROLS = [
 ]
 
 MANAGE_LIBRARY_NAME = "frmManageLibrary"
-# 5 buttons (Edit/Delete/Import/Export/Close, added across 2c/2d) need more
-# width than frmConnectorPicker's 3-button layout - the form itself must be
-# widened to match, or the last two buttons render past its right edge.
-MANAGE_LIBRARY_WIDTH = 440
+# 6 buttons (Edit/Delete/Import/Export Connector/Export Library/Close) need
+# more width than frmConnectorPicker's 3-button layout - the form itself
+# must be widened to match, or the last two buttons render past its right
+# edge.
+MANAGE_LIBRARY_WIDTH = 550
 MANAGE_LIBRARY_CONTROLS = [
-    ("Forms.ListBox.1", "lstConnectors", 12, 12, 416, 200, {}),
+    ("Forms.ListBox.1", "lstConnectors", 12, 12, 526, 200, {}),
     ("Forms.CommandButton.1", "cmdEdit", 12, 220, 80, 24, {"Caption": "Edit"}),
     ("Forms.CommandButton.1", "cmdDelete", 96, 220, 80, 24, {"Caption": "Delete"}),
     ("Forms.CommandButton.1", "cmdImport", 180, 220, 80, 24, {"Caption": "Import..."}),
-    ("Forms.CommandButton.1", "cmdExport", 264, 220, 80, 24, {"Caption": "Export..."}),
-    ("Forms.CommandButton.1", "cmdClose", 348, 220, 80, 24, {"Caption": "Close"}),
+    ("Forms.CommandButton.1", "cmdExport", 264, 220, 80, 24, {"Caption": "Export Connector"}),
+    ("Forms.CommandButton.1", "cmdExportLibrary", 348, 220, 100, 24, {"Caption": "Export Library"}),
+    ("Forms.CommandButton.1", "cmdClose", 452, 220, 80, 24, {"Caption": "Close"}),
 ]
 
 
@@ -128,3 +134,15 @@ def build_manage_library_form(wb, add_userform) -> None:
     # cmdEdit/etc. bottom out at Top(220) + Height(24) = 244 - 260 left only
     # a 16px margin below them, which read as "not tall enough" once shown.
     _build_form(wb, add_userform, MANAGE_LIBRARY_NAME, "Manage Library", MANAGE_LIBRARY_WIDTH, 300, MANAGE_LIBRARY_CONTROLS)
+
+
+REMOVE_CONNECTOR_NAME = "frmRemoveConnector"
+REMOVE_CONNECTOR_CONTROLS = [
+    ("Forms.ListBox.1", "lstConnectors", 12, 12, 300, 200, {}),
+    ("Forms.CommandButton.1", "cmdRemove", 12, 220, 90, 24, {"Caption": "Remove"}),
+    ("Forms.CommandButton.1", "cmdCancel", 110, 220, 90, 24, {"Caption": "Cancel"}),
+]
+
+
+def build_remove_connector_form(wb, add_userform) -> None:
+    _build_form(wb, add_userform, REMOVE_CONNECTOR_NAME, "Remove Connector", 340, 300, REMOVE_CONNECTOR_CONTROLS)

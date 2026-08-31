@@ -8,10 +8,10 @@ LAYER0 = [
 ]
 LAYER1 = [
     "modContract", "modMessages", "modEditorActions", "modPickerActions",
-    "modManageActions",
+    "modManageActions", "modConnectorActions",
 ]
 ADAPTERS = ["frmConnectorEditor", "frmConnectorPicker", "frmManageLibrary",
-            "clsPinMarker", "shHarness", "shConnectors"]
+            "frmRemoveConnector", "clsPinMarker", "shHarness", "shConnectors"]
 FORBIDDEN_IN_LAYER1 = [
     "MsgBox", "InputBox", "GetOpenFilename", "GetSaveAsFilename",
     ".Show", "Unload", "Workbooks.Open", "DoEvents", "MSForms",
@@ -26,9 +26,11 @@ ALLOWED_LAYER0_IN_ADAPTERS = {
         "modLibrary.SlugifyConnectorID", "modLibrary.ExportShapeToFile",
     },
     "frmConnectorPicker": {"modLibrary.ConnectorIndex"},
+    "frmRemoveConnector": {"modConnectors.InstanceIndex"},
     "frmManageLibrary": {
         "modLibrary.ConnectorIndex", "modLibrary.ReadConnector",
         "modLibrary.LIB_ROW_CAP", "modPinEditor.LoadScratchPins",
+        "modLibrary.FindConnectorRow",
     },
     # The drag handler converts pixels to a normalized point and stores it.
     # Both are layer 0 primitives with their own tests; there is no
@@ -99,7 +101,8 @@ def test_nothing_follows_unload_me(wb, adapter):
             )
 
 
-@pytest.mark.parametrize("adapter", ["frmConnectorEditor", "frmConnectorPicker", "frmManageLibrary"])
+@pytest.mark.parametrize("adapter", ["frmConnectorEditor", "frmConnectorPicker",
+                                      "frmManageLibrary", "frmRemoveConnector"])
 def test_every_click_handler_delegates(wb, adapter):
     source = module_source(wb, adapter)
     for sub in re.split(r"\n(?=(?:Private|Public)\s+Sub\s)", source):
@@ -109,7 +112,7 @@ def test_every_click_handler_delegates(wb, adapter):
             continue
         if match.group(1) in NON_DELEGATING_HANDLERS:
             continue
-        assert re.search(r"\bmod(Editor|Picker|Manage)Actions\.", sub), \
+        assert re.search(r"\bmod(Editor|Picker|Manage|Connector)Actions\.", sub), \
             f"{adapter}: {match.group(1)} does no work through an action module"
 
 

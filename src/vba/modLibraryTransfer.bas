@@ -36,6 +36,12 @@ Public Function ExportConnector(wsSrcConn As Worksheet, wsSrcPins As Worksheet, 
     ExportConnector = CopyConnectorPhoto(wsSrcPhotos, wsDestPhotos, sConnectorID, sConnectorID)
 End Function
 
+' Writes under the source's own ConnectorID, overwriting an existing
+' destination row of that ID rather than renaming around it - the caller
+' (modManageActions.ImportOneConnector) has already asked the user before
+' ever reaching a collision, so by the time this runs, a collision means
+' overwrite. DeletePinsForConnector before rewriting is what keeps an
+' overwrite from leaving the previous, larger pin set's extra rows behind.
 Public Function ImportConnector(wsSrcConn As Worksheet, wsSrcPins As Worksheet, wsSrcPhotos As Worksheet, _
                                 wsDestConn As Worksheet, wsDestPins As Worksheet, wsDestPhotos As Worksheet, _
                                 ByVal sConnectorID As String, ByVal sOriginFileName As String) As String
@@ -43,13 +49,11 @@ Public Function ImportConnector(wsSrcConn As Worksheet, wsSrcPins As Worksheet, 
     vFields = modLibrary.ReadConnector(wsSrcConn, 2, modLibrary.LIB_ROW_CAP, sConnectorID)
     If IsEmpty(vFields) Then Exit Function
 
-    Dim sDestID As String
-    sDestID = modLibrary.UniqueConnectorID(wsDestConn, 2, modLibrary.LIB_ROW_CAP, sConnectorID)
-
-    vFields(modLibrary.LIB_COL_ID) = sDestID
-    vFields(modLibrary.LIB_COL_PHOTOSHAPE) = "PHOTO_" & sDestID
+    vFields(modLibrary.LIB_COL_PHOTOSHAPE) = "PHOTO_" & sConnectorID
     vFields(modLibrary.LIB_COL_ORIGIN) = sOriginFileName
     If Not modLibrary.WriteConnector(wsDestConn, 2, modLibrary.LIB_ROW_CAP, vFields) Then Exit Function
+
+    modLibrary.DeletePinsForConnector wsDestPins, 2, modLibrary.LIB_ROW_CAP, sConnectorID
 
     Dim vPins As Variant, i As Long, j As Long, vRow(1 To 7) As Variant
     vPins = modLibrary.ReadPinsForConnector(wsSrcPins, 2, modLibrary.LIB_ROW_CAP, sConnectorID)
@@ -58,14 +62,13 @@ Public Function ImportConnector(wsSrcConn As Worksheet, wsSrcPins As Worksheet, 
             For j = 1 To modLibrary.PIN_FIELD_COUNT
                 vRow(j) = vPins(i, j)
             Next j
-            vRow(1) = sDestID
             modLibrary.WritePin wsDestPins, 2, modLibrary.LIB_ROW_CAP, vRow
         Next i
     End If
 
-    CopyConnectorPhoto wsSrcPhotos, wsDestPhotos, sConnectorID, sDestID
+    CopyConnectorPhoto wsSrcPhotos, wsDestPhotos, sConnectorID, sConnectorID
 
-    ImportConnector = sDestID
+    ImportConnector = sConnectorID
 End Function
 
 Public Sub BuildExportSheets(wb As Workbook)

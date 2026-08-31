@@ -129,6 +129,37 @@ Public Function RenameRefDes(ByVal sOldRefDes As String, ByVal sNewRefDes As Str
     RenameRefDes = True
 End Function
 
+' Display strings for every placed connector instance, for the Remove
+' Connector picker - "<RefDes> - <Name>" paired with the bare RefDes,
+' matching modLibrary.ConnectorIndex's shape for the library picker.
+Public Function InstanceIndex() As Variant
+    Dim ws As Worksheet
+    Dim r As Long, nLast As Long, n As Long
+    Dim vRows() As Variant
+
+    Set ws = ThisWorkbook.Worksheets(CONN_SHEET)
+    nLast = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    If nLast < CONN_FIRST_ROW Then Exit Function
+
+    ReDim vRows(1 To nLast - CONN_FIRST_ROW + 1, 1 To 2)
+    For r = CONN_FIRST_ROW To nLast
+        If Len(Trim$(CStr(ws.Cells(r, 1).Value))) > 0 Then
+            n = n + 1
+            vRows(n, 1) = Trim$(CStr(ws.Cells(r, 1).Value)) & " - " & CStr(ws.Cells(r, 3).Value)
+            vRows(n, 2) = Trim$(CStr(ws.Cells(r, 1).Value))
+        End If
+    Next r
+    If n = 0 Then Exit Function
+
+    Dim vResult() As Variant, i As Long
+    ReDim vResult(1 To n, 1 To 2)
+    For i = 1 To n
+        vResult(i, 1) = vRows(i, 1)
+        vResult(i, 2) = vRows(i, 2)
+    Next i
+    InstanceIndex = vResult
+End Function
+
 Public Function RemoveConnectorInstance(ByVal sRefDes As String) As Boolean
     Dim ws As Worksheet, wsChart As Worksheet
     Dim r As Long, nLast As Long, c As Long
@@ -181,6 +212,41 @@ Public Function RemoveConnectorInstance(ByVal sRefDes As String) As Boolean
 
 CleanUp:
     Application.EnableEvents = bEvents
+End Function
+
+' Removes every placed instance of a connector definition, for when that
+' definition is deleted from the library out from under them. Ref des are
+' collected first: RemoveConnectorInstance compacts the sheet by row, so
+' removing by value in a fresh scan each time (rather than by row index)
+' is what stays correct as rows shift underneath the loop.
+Public Function RemoveInstancesOfConnectorType(ByVal sConnectorID As String) As Variant
+    Dim ws As Worksheet
+    Dim r As Long, nLast As Long, n As Long
+    Dim vMatches() As String
+
+    Set ws = ThisWorkbook.Worksheets(CONN_SHEET)
+    nLast = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+
+    ReDim vMatches(1 To nLast)
+    For r = CONN_FIRST_ROW To nLast
+        If StrComp(Trim$(CStr(ws.Cells(r, 2).Value)), sConnectorID, vbTextCompare) = 0 Then
+            n = n + 1
+            vMatches(n) = Trim$(CStr(ws.Cells(r, 1).Value))
+        End If
+    Next r
+    If n = 0 Then Exit Function
+
+    Dim i As Long
+    For i = 1 To n
+        RemoveConnectorInstance vMatches(i)
+    Next i
+
+    Dim vResult() As String
+    ReDim vResult(1 To n)
+    For i = 1 To n
+        vResult(i) = vMatches(i)
+    Next i
+    RemoveInstancesOfConnectorType = vResult
 End Function
 
 ' Everything shConnectors's Worksheet_Change decides. sPriorRefDes and

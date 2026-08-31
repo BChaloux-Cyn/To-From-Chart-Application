@@ -72,22 +72,31 @@ Public Function PinListItems(wsScratch As Worksheet, ByVal sConnectorID As Strin
     PinListItems = vRows
 End Function
 
-' One past the highest placed pin number, so a deletion never causes a
-' reused number. Replaces the form's mNextPinNumber counter.
-Public Function NextPinNumber(wsScratch As Worksheet, ByVal sConnectorID As String) As Long
-    Dim vItems As Variant, i As Long, nMax As Long
+' The lowest pin number in 1..nPinCount not already placed, so a deleted
+' pin's number becomes available for reuse instead of a connector's pins
+' running past its own declared count. Replaces the form's mNextPinNumber
+' counter. The caller (PhotoClickAction) already guarantees nPlaced <
+' nPinCount before calling this, so a gap always exists.
+Public Function NextPinNumber(wsScratch As Worksheet, ByVal sConnectorID As String, _
+                              ByVal nPinCount As Long) As Long
+    Dim vItems As Variant, i As Long, n As Long
+    Dim bUsed() As Boolean
 
+    ReDim bUsed(1 To nPinCount)
     vItems = PinListItems(wsScratch, sConnectorID)
-    If IsEmpty(vItems) Then
-        NextPinNumber = 1
-        Exit Function
+    If Not IsEmpty(vItems) Then
+        For i = LBound(vItems, 1) To UBound(vItems, 1)
+            n = CLng(vItems(i, 2))
+            If n >= 1 And n <= nPinCount Then bUsed(n) = True
+        Next i
     End If
 
-    For i = LBound(vItems, 1) To UBound(vItems, 1)
-        If CLng(vItems(i, 2)) > nMax Then nMax = CLng(vItems(i, 2))
-    Next i
-
-    NextPinNumber = nMax + 1
+    For n = 1 To nPinCount
+        If Not bUsed(n) Then
+            NextPinNumber = n
+            Exit Function
+        End If
+    Next n
 End Function
 
 ' mConnectorID is derived from Name and Part Number when the photo loads
@@ -177,7 +186,7 @@ Public Function PhotoClickAction(wsScratch As Worksheet, ByVal sConnectorID As S
             Exit Function
         End If
 
-        nNext = NextPinNumber(wsScratch, sConnectorID)
+        nNext = NextPinNumber(wsScratch, sConnectorID, nPinCount)
         If modPinEditor.PlacePin(wsScratch, sConnectorID, nNext, _
                                  "Pin " & CStr(nNext), dNormX, dNormY) Then
             PhotoClickAction = modContract.Success("PLACED", nNext)

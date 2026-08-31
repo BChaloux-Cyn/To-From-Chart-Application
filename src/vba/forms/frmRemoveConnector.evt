@@ -1,0 +1,43 @@
+Option Explicit
+
+Private mRefDes() As String
+
+Private Sub UserForm_Initialize()
+    RefreshList
+End Sub
+
+Private Sub RefreshList()
+    Dim vIndex As Variant, i As Long, n As Long
+
+    lstConnectors.Clear
+    Erase mRefDes
+
+    vIndex = modConnectors.InstanceIndex()
+    n = modContract.TableRowCount(vIndex)
+    If n = 0 Then Exit Sub
+
+    ReDim mRefDes(1 To n)
+    For i = 1 To n
+        lstConnectors.AddItem CStr(vIndex(i, 1))
+        mRefDes(i) = CStr(vIndex(i, 2))
+    Next i
+End Sub
+
+Private Sub cmdRemove_Click()
+    If lstConnectors.ListIndex < 0 Then Exit Sub
+
+    Dim sRefDes As String, vResult As Variant
+    sRefDes = mRefDes(lstConnectors.ListIndex + 1)
+
+    vResult = modConnectorActions.RemoveInstance(sRefDes)
+    If Not modContract.Ok(vResult) Then
+        MsgBox modMessages.MessageFor(vResult), modMessages.MessageStyleFor(vResult)
+        Exit Sub
+    End If
+
+    Unload Me
+End Sub
+
+Private Sub cmdCancel_Click()
+    Unload Me
+End Sub

@@ -36,7 +36,7 @@ def test_import_with_no_collision_keeps_its_id(wb, library_wb, app, tmp_path):
         src_wb.Close(SaveChanges=False)
 
 
-def test_import_colliding_with_a_local_id_is_renamed_and_the_original_kept(wb, library_wb, app, tmp_path):
+def test_import_colliding_with_a_local_id_overwrites_it_in_place(wb, library_wb, app, tmp_path):
     ws_dest_conn = library_wb.Worksheets("Connectors")
     existing = ("DTM-04P", "A different local part", "", "", "Connector", 1, "", "", "", "", "Local")
     run(wb, "modLibrary.WriteConnector", ws_dest_conn, 2, 100000, existing)
@@ -49,31 +49,34 @@ def test_import_colliding_with_a_local_id_is_renamed_and_the_original_kept(wb, l
             "DTM-04P", "other_library.xlsx",
         )
 
-        assert dest_id == "DTM-04P-2"
-        original = run(wb, "modLibrary.ReadConnector", ws_dest_conn, 2, 100000, "DTM-04P")
-        assert original[1] == "A different local part"
-        imported = run(wb, "modLibrary.ReadConnector", ws_dest_conn, 2, 100000, "DTM-04P-2")
-        assert imported[1] == "Deutsch DTM 4-way"
+        assert dest_id == "DTM-04P"
+        overwritten = run(wb, "modLibrary.ReadConnector", ws_dest_conn, 2, 100000, "DTM-04P")
+        assert overwritten[1] == "Deutsch DTM 4-way"
     finally:
         src_wb.Close(SaveChanges=False)
 
 
-def test_import_pins_are_rewritten_under_the_renamed_id(wb, library_wb, app, tmp_path):
+def test_import_pins_replace_the_previous_pin_set_on_overwrite(wb, library_wb, app, tmp_path):
     ws_dest_conn = library_wb.Worksheets("Connectors")
-    existing = ("DTM-04P", "A different local part", "", "", "Connector", 1, "", "", "", "", "Local")
+    ws_dest_pins = library_wb.Worksheets("Pins")
+    existing = ("DTM-04P", "A different local part", "", "", "Connector", 2, "", "", "", "", "Local")
     run(wb, "modLibrary.WriteConnector", ws_dest_conn, 2, 100000, existing)
+    run(wb, "modLibrary.WritePin", ws_dest_pins, 2, 100000, ("DTM-04P", 1, "Old A", 0.1, 0.1, 0.1, 0.1))
+    run(wb, "modLibrary.WritePin", ws_dest_pins, 2, 100000, ("DTM-04P", 2, "Old B", 0.2, 0.2, 0.2, 0.2))
 
+    # seed_source_connector's connector has a single pin.
     src_wb, ws_src_conn, ws_src_pins, ws_src_photos = seed_source_connector(wb, app, tmp_path)
     try:
         dest_id = run(
             wb, "modLibraryTransfer.ImportConnector", ws_src_conn, ws_src_pins, ws_src_photos,
-            ws_dest_conn, library_wb.Worksheets("Pins"), library_wb.Worksheets("Photos"),
+            ws_dest_conn, ws_dest_pins, library_wb.Worksheets("Photos"),
             "DTM-04P", "other_library.xlsx",
         )
 
-        pins = run(wb, "modLibrary.ReadPinsForConnector", library_wb.Worksheets("Pins"), 2, 100000, dest_id)
+        pins = run(wb, "modLibrary.ReadPinsForConnector", ws_dest_pins, 2, 100000, dest_id)
         assert len(pins) == 1
         assert pins[0][0] == dest_id
+        assert pins[0][2] == "A"
     finally:
         src_wb.Close(SaveChanges=False)
 

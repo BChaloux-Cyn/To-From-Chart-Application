@@ -18,10 +18,13 @@ Public Function OutcomeCodes() As Variant
         "OK", "MISSING_NAME_OR_PART", _
         "PIN_DELETED", "PIN_NOT_FOUND", _
         "ADDED", "ADD_FAILED", "CONNECTOR_NOT_FOUND", "CONNECTOR_DELETED", _
-        "EXPORTED", "EXPORT_FAILED", "IMPORTED", _
+        "CONNECTOR_DELETED_CASCADED", _
+        "CONNECTOR_IMPORTED", "CONNECTOR_IMPORTED_CASCADED", _
+        "EXPORTED", "EXPORT_FAILED", "LIBRARY_EXPORTED", _
         "PHOTO_ATTACHED", "PHOTO_FAILED", _
         "RENAMED", "RENAME_REJECTED", "NO_RENAME", _
-        "BULK_REBUILT", "CELLS_REBUILT", "UNITS_SET")
+        "BULK_REBUILT", "CELLS_REBUILT", "UNITS_SET", _
+        "INSTANCE_REMOVED", "INSTANCE_NOT_FOUND")
 End Function
 
 ' One code maps to exactly one payload kind. PIN_DELETED and
@@ -31,17 +34,19 @@ Public Function PayloadKind(ByVal sOutcome As String) As String
     Select Case sOutcome
         Case "PLACED", "MOVED_ANCHOR", "PIN_LIMIT_REACHED", "PIN_DELETED", "PIN_NOT_FOUND"
             PayloadKind = KIND_LONG
-        Case "BULK_REBUILT", "CELLS_REBUILT"
+        Case "BULK_REBUILT", "CELLS_REBUILT", "LIBRARY_EXPORTED"
             PayloadKind = KIND_LONG
         Case "SAVED", "ID_COLLISION", "SAVE_FAILED", "CACHE_READY", "NEEDS_BACKFILL"
             PayloadKind = KIND_STRING
-        Case "ADDED", "ADD_FAILED", "CONNECTOR_NOT_FOUND", "CONNECTOR_DELETED"
+        Case "ADDED", "ADD_FAILED", "CONNECTOR_NOT_FOUND", "CONNECTOR_DELETED", "CONNECTOR_IMPORTED"
             PayloadKind = KIND_STRING
         Case "EXPORTED", "EXPORT_FAILED", "PHOTO_ATTACHED", "PHOTO_FAILED"
             PayloadKind = KIND_STRING
         Case "RENAMED", "RENAME_REJECTED", "UNITS_SET"
             PayloadKind = KIND_STRING
-        Case "IMPORTED"
+        Case "INSTANCE_REMOVED", "INSTANCE_NOT_FOUND"
+            PayloadKind = KIND_STRING
+        Case "CONNECTOR_DELETED_CASCADED", "CONNECTOR_IMPORTED_CASCADED"
             PayloadKind = KIND_TABLE
         Case "BAD_PIN_COUNT", "NO_OP", "OK", "MISSING_NAME_OR_PART", "NO_RENAME"
             PayloadKind = KIND_NONE

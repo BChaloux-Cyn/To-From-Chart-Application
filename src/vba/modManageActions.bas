@@ -1,13 +1,16 @@
 Attribute VB_Name = "modManageActions"
 Option Explicit
 
-' Removing a connector everywhere it exists: the three library sheets plus
-' the editor's on-disk preview cache, which would otherwise be orphaned -
-' nothing ever reads a cache file whose connector is gone.
+' Removing a connector everywhere it exists: the three library sheets, the
+' editor's on-disk preview cache (which would otherwise be orphaned -
+' nothing ever reads a cache file whose connector is gone), and any
+' instance of it already placed on the currently open harness's chart,
+' which would otherwise keep referencing a ConnectorID the library no
+' longer has.
 Public Function DeleteFromLibrary(wsLibConn As Worksheet, wsLibPins As Worksheet, _
                                   wsLibPhotos As Worksheet, ByVal sWorkbookPath As String, _
                                   ByVal sConnectorID As String) As Variant
-    Dim sCachePath As String
+    Dim sCachePath As String, vRemoved As Variant
 
     modLibrary.DeleteConnector wsLibConn, 2, modLibrary.LIB_ROW_CAP, sConnectorID
     modLibrary.DeletePinsForConnector wsLibPins, 2, modLibrary.LIB_ROW_CAP, sConnectorID
@@ -16,7 +19,12 @@ Public Function DeleteFromLibrary(wsLibConn As Worksheet, wsLibPins As Worksheet
     sCachePath = modLibrary.CachePhotoPath(sWorkbookPath, sConnectorID, "jpg")
     If Len(Dir$(sCachePath)) > 0 Then Kill sCachePath
 
-    DeleteFromLibrary = modContract.Success("CONNECTOR_DELETED", sConnectorID)
+    vRemoved = modConnectors.RemoveInstancesOfConnectorType(sConnectorID)
+    If IsEmpty(vRemoved) Then
+        DeleteFromLibrary = modContract.Success("CONNECTOR_DELETED", sConnectorID)
+    Else
+        DeleteFromLibrary = modContract.Success("CONNECTOR_DELETED_CASCADED", vRemoved)
+    End If
 End Function
 
 ' destWb is created by the adapter (Workbooks.Add) and saved by it
@@ -35,60 +43,71 @@ Public Function ExportToWorkbook(wsLibConn As Worksheet, wsLibPins As Worksheet,
     End If
 End Function
 
-' Every connector in a shared export file, copied into this library.
-' modLibraryTransfer.ImportConnector renames on an ID collision and
-' attempts the photo copy itself; the photo copy goes through the
-' clipboard and is not reliable, so rather than redoing it here (which
-' could give a different answer than the one that actually happened) this
-' checks whether the shape it should have produced exists, and reports
-' per connector. The adapter prompts for a replacement where it did not.
-Public Function ImportAllFromWorkbook(srcWb As Workbook, wsLibConn As Worksheet, _
-                                      wsLibPins As Worksheet, wsLibPhotos As Worksheet) As Variant
-    Dim wsSrcConn As Worksheet, nLast As Long, r As Long, n As Long
-    Dim sConnectorID As String, sDestID As String, sOriginName As String
-    Dim vRows() As Variant, bPhotoOk As Boolean
+' One connector from a shared export or library file, copied into this
+' library under its own ID - the adapter has already resolved any Part
+' Number conflict (Keep/Overwrite) before ever calling this, so an existing
+' row of the same ID here means overwrite. If overwriting changes the pin
+' count, any chart instances already placed against this ID would hold
+' stale pin references, so they are removed the same way a library
+' deletion removes them (modConnectors.RemoveInstancesOfConnectorType).
+Public Function ImportOneConnector(srcWb As Workbook, wsLibConn As Worksheet, _
+                                   wsLibPins As Worksheet, wsLibPhotos As Worksheet, _
+                                   ByVal sConnectorID As String, ByVal sOriginFileName As String) As Variant
+    Dim vExisting As Variant, bExisted As Boolean, nOldPinCount As Long, nNewPinCount As Long
+    Dim vRemoved As Variant
 
-    Set wsSrcConn = srcWb.Worksheets("Connectors")
-    sOriginName = srcWb.Name
-    nLast = wsSrcConn.Cells(wsSrcConn.Rows.Count, modLibrary.LIB_COL_ID).End(xlUp).Row
-    If nLast < 2 Then
-        ImportAllFromWorkbook = modContract.Success("IMPORTED", Empty)
-        Exit Function
-    End If
+    vExisting = modLibrary.ReadConnector(wsLibConn, 2, modLibrary.LIB_ROW_CAP, sConnectorID)
+    bExisted = Not IsEmpty(vExisting)
+    If bExisted Then nOldPinCount = CLng(vExisting(modLibrary.LIB_COL_PINCOUNT))
 
-    ReDim vRows(1 To nLast - 1, 1 To 2)
-    For r = 2 To nLast
-        sConnectorID = Trim$(CStr(wsSrcConn.Cells(r, modLibrary.LIB_COL_ID).Value))
-        If Len(sConnectorID) > 0 Then
-            sDestID = modLibraryTransfer.ImportConnector(wsSrcConn, _
-                srcWb.Worksheets("Pins"), srcWb.Worksheets("Photos"), _
-                wsLibConn, wsLibPins, wsLibPhotos, sConnectorID, sOriginName)
+    modLibraryTransfer.ImportConnector srcWb.Worksheets("Connectors"), srcWb.Worksheets("Pins"), _
+        srcWb.Worksheets("Photos"), wsLibConn, wsLibPins, wsLibPhotos, sConnectorID, sOriginFileName
 
-            If Len(sDestID) > 0 Then
-                bPhotoOk = False
-                On Error Resume Next
-                bPhotoOk = Not (wsLibPhotos.Shapes("PHOTO_" & sDestID) Is Nothing)
-                On Error GoTo 0
-
-                n = n + 1
-                vRows(n, 1) = sDestID
-                vRows(n, 2) = bPhotoOk
+    If bExisted Then
+        vExisting = modLibrary.ReadConnector(wsLibConn, 2, modLibrary.LIB_ROW_CAP, sConnectorID)
+        nNewPinCount = CLng(vExisting(modLibrary.LIB_COL_PINCOUNT))
+        If nNewPinCount <> nOldPinCount Then
+            vRemoved = modConnectors.RemoveInstancesOfConnectorType(sConnectorID)
+            If Not IsEmpty(vRemoved) Then
+                ImportOneConnector = modContract.Success("CONNECTOR_IMPORTED_CASCADED", vRemoved)
+                Exit Function
             End If
         End If
-    Next r
-
-    If n = 0 Then
-        ImportAllFromWorkbook = modContract.Success("IMPORTED", Empty)
-        Exit Function
     End If
 
-    Dim vResult() As Variant, i As Long
-    ReDim vResult(1 To n, 1 To 2)
+    ImportOneConnector = modContract.Success("CONNECTOR_IMPORTED", sConnectorID)
+End Function
+
+' Whether the just-imported connector's photo actually carried over. The
+' photo copy goes through the clipboard and is not reliable, so rather than
+' trusting the copy call's own return value, this checks whether the shape
+' it should have produced exists. The adapter prompts for a replacement
+' where it did not.
+Public Function ImportedPhotoOk(wsLibPhotos As Worksheet, ByVal sConnectorID As String) As Boolean
+    On Error Resume Next
+    ImportedPhotoOk = Not (wsLibPhotos.Shapes("PHOTO_" & sConnectorID) Is Nothing)
+    On Error GoTo 0
+End Function
+
+' Every connector in the library, exported into one shared workbook -
+' mirrors ExportToWorkbook per connector rather than duplicating its logic.
+Public Function ExportLibraryToWorkbook(wsLibConn As Worksheet, wsLibPins As Worksheet, _
+                                        wsLibPhotos As Worksheet, destWb As Workbook) As Variant
+    modLibraryTransfer.BuildExportSheets destWb
+
+    Dim vIndex As Variant, i As Long, n As Long, nExported As Long
+    vIndex = modLibrary.ConnectorIndex(wsLibConn)
+    n = modContract.TableRowCount(vIndex)
+
     For i = 1 To n
-        vResult(i, 1) = vRows(i, 1)
-        vResult(i, 2) = vRows(i, 2)
+        If modLibraryTransfer.ExportConnector(wsLibConn, wsLibPins, wsLibPhotos, _
+                destWb.Worksheets("Connectors"), destWb.Worksheets("Pins"), _
+                destWb.Worksheets("Photos"), CStr(vIndex(i, 2))) Then
+            nExported = nExported + 1
+        End If
     Next i
-    ImportAllFromWorkbook = modContract.Success("IMPORTED", vResult)
+
+    ExportLibraryToWorkbook = modContract.Success("LIBRARY_EXPORTED", nExported)
 End Function
 
 Public Function AttachReplacementPhoto(wsLibPhotos As Worksheet, ByVal sDestID As String, _
