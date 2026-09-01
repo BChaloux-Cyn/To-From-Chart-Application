@@ -24,7 +24,7 @@ VBA_MODULES = [
     "modConnectorUI.bas", "modLibraryTransfer.bas", "modContract.bas",
     "modMessages.bas", "modEditorActions.bas", "modPickerActions.bas",
     "modManageActions.bas", "modConnectorActions.bas",
-    "modHarnessBuild.bas",
+    "modHarnessBuild.bas", "modHarnessActions.bas",
 ]
 BUILD_VERSION = "0.1.0"
 
