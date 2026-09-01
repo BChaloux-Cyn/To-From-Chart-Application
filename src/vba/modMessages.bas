@@ -39,6 +39,10 @@ Public Function MessageFor(vResult As Variant) As String
             MessageFor = "Could not attach a photo for " & CStr(vPayload) & "."
         Case "INSTANCE_NOT_FOUND"
             MessageFor = "No connector instance '" & CStr(vPayload) & "' found."
+        Case "HARNESS_SAVED"
+            MessageFor = "Saved. " & CStr(vPayload) & " wire(s) written."
+        Case "HARNESS_SAVE_FAILED"
+            MessageFor = "Could not save the harness: " & CStr(vPayload) & "."
         Case Else
             MessageFor = ""
     End Select

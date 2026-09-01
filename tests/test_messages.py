@@ -74,3 +74,14 @@ def test_style_is_information_on_success_and_exclamation_on_failure(wb):
     bad = run(wb, "modContract.Failure", "EXPORT_FAILED", "DTM-04P")
     assert run(wb, "modMessages.MessageStyleFor", ok) == 64      # vbInformation
     assert run(wb, "modMessages.MessageStyleFor", bad) == 48     # vbExclamation
+
+
+def test_message_for_harness_saved(wb):
+    result = run(wb, "modContract.Success", "HARNESS_SAVED", 12)
+    assert run(wb, "modMessages.MessageFor", result) == "Saved. 12 wire(s) written."
+
+
+def test_message_for_harness_save_failed(wb):
+    result = run(wb, "modContract.Failure", "HARNESS_SAVE_FAILED", "destination workbook is not fresh")
+    assert run(wb, "modMessages.MessageFor", result) == \
+        "Could not save the harness: destination workbook is not fresh."

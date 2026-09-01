@@ -59,3 +59,11 @@ def test_run_action_rejects_a_non_envelope_return(wb):
     # PayloadKind is a query returning a bare string, not an envelope.
     with pytest.raises(AssertionError):
         run_action(wb, "modContract.PayloadKind", "SAVED")
+
+
+def test_harness_saved_declares_a_long_payload(wb):
+    assert run(wb, "modContract.PayloadKind", "HARNESS_SAVED") == "LONG"
+
+
+def test_harness_save_failed_declares_a_string_payload(wb):
+    assert run(wb, "modContract.PayloadKind", "HARNESS_SAVE_FAILED") == "STRING"
