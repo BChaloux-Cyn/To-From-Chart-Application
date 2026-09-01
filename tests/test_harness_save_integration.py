@@ -1,10 +1,11 @@
+import shutil
 from pathlib import Path
 
 from tests.conftest import run, run_action
 from tests.fixtures.sample_photo import write_sample_photo
 
 
-def test_full_harness_round_trips_through_a_saved_file(wb, app, tmp_path):
+def test_full_harness_round_trips_through_a_saved_file(wb, app, artifact, tmp_path):
     wsHarness = wb.Worksheets("Harness")
     wsHarness.Range("B2").Value = "Dash Harness"
     wsHarness.Range("E2").Value = "HN-100"
@@ -149,3 +150,44 @@ def test_full_harness_round_trips_through_a_saved_file(wb, app, tmp_path):
         assert "HN-100" in page_ps.CenterFooter
     finally:
         reopened.Close(SaveChanges=False)
+
+    # Load half: a genuinely independent Creator instance proves the save/load
+    # pair reconstructs state, rather than passing on in-memory state the save
+    # half already had. Opening `artifact` a second time would NOT give one -
+    # Excel returns the same Workbook object for an already-open path
+    # (Workbooks.Count stays 1 and edits are shared through both handles), so
+    # the artifact is copied to a fresh path first. Relocating it is safe
+    # because nothing LoadHarness calls reads ThisWorkbook.Path.
+    creator2_path = tmp_path / "HarnessCreator2.xlsm"
+    shutil.copyfile(artifact, creator2_path)
+
+    wb2 = app.Workbooks.Open(str(creator2_path))
+    try:
+        srcWb = app.Workbooks.Open(str(saved_path))
+        try:
+            load_result = run_action(wb2, "modHarnessActions.LoadHarness", srcWb)
+            assert load_result.ok is True
+            assert load_result.outcome == "HARNESS_LOADED"
+        finally:
+            srcWb.Close(SaveChanges=False)
+
+        loaded_harness = wb2.Worksheets("Harness")
+        assert loaded_harness.Range("B2").Value == "Dash Harness"
+        assert loaded_harness.Cells(7, 1).Value == "J1"
+        assert loaded_harness.Cells(7, 4).Value == "12V_SW"
+
+        loaded_conn = wb2.Worksheets("Connectors")
+        assert loaded_conn.Cells(2, 1).Value == "J1"
+        assert loaded_conn.Cells(2, 2).Value == "DTM-04P"
+
+        # fields_round_tripped, not fields: the snapshot reaches this point
+        # through the same Excel value coercion as the save half asserted
+        # above (4 -> 4.0, "" -> None).
+        loaded_snap = wb2.Worksheets("_Snapshot")
+        loaded_fields = run(wb2, "modLibrary.ReadConnector", loaded_snap, 2, 201, "DTM-04P")
+        assert tuple(loaded_fields) == fields_round_tripped
+
+        assert run(wb2, "modState.GetState", "HarnessPath") == str(saved_path)
+        assert run(wb2, "modState.GetState", "Dirty") == "FALSE"
+    finally:
+        wb2.Close(SaveChanges=False)
