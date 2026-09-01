@@ -12,6 +12,7 @@ Public Const CONN_TABLE_FIRST_ROW As Long = 2
 Public Const CONN_OVAL_DIAMETER As Double = 14
 
 Private Const MSO_SHAPE_OVAL As Long = 9
+Private Const TABLE_HEADERS As String = "Pin,Label,Wire To,Signal,Color,AWG,Termination,Length"
 
 Public Function PagePhotoPath(ByVal sLibraryFolder As String, ByVal sConnectorID As String) As String
     Dim sJpg As String, sPng As String
@@ -128,4 +129,30 @@ Public Sub PlaceLeaderLines(wsPage As Worksheet, shpPhoto As Shape, vPins As Var
 
 NextPin:
     Next i
+End Sub
+
+Public Sub WriteTableSkeleton(wsPage As Worksheet, vPins As Variant)
+    Dim vHeaders As Variant, i As Long, r As Long
+    Dim cel As Range
+
+    vHeaders = Split(TABLE_HEADERS, ",")
+    For i = LBound(vHeaders) To UBound(vHeaders)
+        Set cel = wsPage.Cells(CONN_TABLE_HEADER_ROW, CONN_TABLE_FIRST_COL + i)
+        cel.Value = vHeaders(i)
+        cel.Font.Bold = True
+        cel.Interior.Color = &HD9D9D9
+    Next i
+
+    If IsEmpty(vPins) Then Exit Sub
+
+    For i = LBound(vPins, 1) To UBound(vPins, 1)
+        r = CONN_TABLE_FIRST_ROW + (i - LBound(vPins, 1))
+        wsPage.Cells(r, CONN_TABLE_FIRST_COL).Value = CLng(vPins(i, PinCol(vPins, modLibrary.PIN_COL_PINNUM)))
+        wsPage.Cells(r, CONN_TABLE_FIRST_COL + 1).Value = CStr(vPins(i, PinCol(vPins, modLibrary.PIN_COL_LABEL)))
+    Next i
+End Sub
+
+Public Sub WriteMetadata(wsPage As Worksheet, ByVal sConnectorID As String)
+    wsPage.Cells(1, CONN_META_COL).Value = sConnectorID
+    wsPage.Columns(CONN_META_COL).Hidden = True
 End Sub

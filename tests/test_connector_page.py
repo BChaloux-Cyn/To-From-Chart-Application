@@ -109,3 +109,35 @@ def test_leader_line_drawn_only_when_marker_is_pulled_off_anchor(wb, app, tmp_pa
         assert "LEADER_2" in names
     finally:
         dest.Close(SaveChanges=False)
+
+
+def test_write_table_skeleton_writes_headers_and_static_columns(wb, app):
+    dest = app.Workbooks.Add()
+    try:
+        ws = dest.Worksheets(1)
+        pins = (
+            ("DTM-04P", 1, "+12V", 0.1, 0.1, 0.1, 0.1),
+            ("DTM-04P", 2, "GND", 0.9, 0.1, 0.9, 0.1),
+        )
+        run(wb, "modConnectorPage.WriteTableSkeleton", ws, pins)
+
+        assert ws.Cells(1, 10).Value == "Pin"
+        assert ws.Cells(1, 17).Value == "Length"
+        assert ws.Cells(2, 10).Value == 1
+        assert ws.Cells(2, 11).Value == "+12V"
+        assert ws.Cells(3, 10).Value == 2
+        assert ws.Cells(3, 11).Value == "GND"
+        assert ws.Cells(2, 12).Value is None  # Wire To left for 3c
+    finally:
+        dest.Close(SaveChanges=False)
+
+
+def test_write_metadata_hides_the_connector_id_column(wb, app):
+    dest = app.Workbooks.Add()
+    try:
+        ws = dest.Worksheets(1)
+        run(wb, "modConnectorPage.WriteMetadata", ws, "DTM-04P")
+        assert ws.Cells(1, 27).Value == "DTM-04P"
+        assert ws.Columns(27).Hidden is True
+    finally:
+        dest.Close(SaveChanges=False)
