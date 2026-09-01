@@ -4,11 +4,11 @@ import pytest
 
 LAYER0 = [
     "modUtil", "modState", "modLibrary", "modChart", "modConnectors",
-    "modSnapshot", "modLibraryTransfer", "modPinEditor",
+    "modSnapshot", "modLibraryTransfer", "modPinEditor", "modHarnessBuild",
 ]
 LAYER1 = [
     "modContract", "modMessages", "modEditorActions", "modPickerActions",
-    "modManageActions", "modConnectorActions",
+    "modManageActions", "modConnectorActions", "modHarnessActions",
 ]
 ADAPTERS = ["frmConnectorEditor", "frmConnectorPicker", "frmManageLibrary",
             "frmRemoveConnector", "clsPinMarker", "shHarness", "shConnectors"]
