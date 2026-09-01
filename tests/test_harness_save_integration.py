@@ -107,5 +107,10 @@ def test_full_harness_round_trips_through_a_saved_file(wb, app, tmp_path):
         assert j2.Cells(2, 16).Value == "Ring Terminal"   # To side sees To Term
 
         assert reopened.HasVBProject is False  # macro-free
+
+        wsHarnessReopened = reopened.Worksheets("Harness")
+        wsHarnessReopened.Cells(7, 5).Value = "Blue"  # hand-edit Color on the open, macro-free file
+        assert j1.Cells(2, 14).Value == "Blue"
+        assert j2.Cells(2, 14).Value == "Blue"
     finally:
         reopened.Close(SaveChanges=False)
