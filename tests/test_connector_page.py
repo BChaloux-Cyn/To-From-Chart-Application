@@ -141,3 +141,29 @@ def test_write_metadata_hides_the_connector_id_column(wb, app):
         assert ws.Columns(27).Hidden is True
     finally:
         dest.Close(SaveChanges=False)
+
+
+def test_lookup_formula_for_a_direction_independent_column(wb):
+    formula = run(wb, "modConnectorPage.LookupFormula", "D", "D", "J1", 2)
+    assert formula == (
+        '=IFERROR(INDEX(Harness!$D$7:$D$1006,MATCH("J1|"&$J2,Harness!$L$7:$L$1006,0)),'
+        'IFERROR(INDEX(Harness!$D$7:$D$1006,MATCH("J1|"&$J2,Harness!$M$7:$M$1006,0)),""))'
+    )
+
+
+def test_lookup_formula_for_termination_uses_different_from_and_to_columns(wb):
+    formula = run(wb, "modConnectorPage.LookupFormula", "C", "H", "J1", 3)
+    assert formula == (
+        '=IFERROR(INDEX(Harness!$C$7:$C$1006,MATCH("J1|"&$J3,Harness!$L$7:$L$1006,0)),'
+        'IFERROR(INDEX(Harness!$H$7:$H$1006,MATCH("J1|"&$J3,Harness!$M$7:$M$1006,0)),""))'
+    )
+
+
+def test_wire_to_formula_combines_ref_des_and_pin(wb):
+    formula = run(wb, "modConnectorPage.WireToFormula", "J1", 2)
+    assert formula == (
+        '=IFERROR(INDEX(Harness!$I$7:$I$1006,MATCH("J1|"&$J2,Harness!$L$7:$L$1006,0))&"-"&'
+        'INDEX(Harness!$J$7:$J$1006,MATCH("J1|"&$J2,Harness!$L$7:$L$1006,0)),'
+        'IFERROR(INDEX(Harness!$A$7:$A$1006,MATCH("J1|"&$J2,Harness!$M$7:$M$1006,0))&"-"&'
+        'INDEX(Harness!$B$7:$B$1006,MATCH("J1|"&$J2,Harness!$M$7:$M$1006,0)),""))'
+    )

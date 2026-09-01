@@ -160,3 +160,26 @@ Public Sub WriteMetadata(wsPage As Worksheet, ByVal sConnectorID As String)
     wsPage.Cells(1, CONN_META_COL).Value = sConnectorID
     wsPage.Columns(CONN_META_COL).Hidden = True
 End Sub
+
+Private Function KeyExpr(ByVal sRefDes As String, ByVal nTableRow As Long) As String
+    KeyExpr = """" & sRefDes & "|""&$J" & CStr(nTableRow)
+End Function
+
+Public Function LookupFormula(ByVal sFromCol As String, ByVal sToCol As String, _
+                              ByVal sRefDes As String, ByVal nTableRow As Long) As String
+    Dim sKey As String
+    sKey = KeyExpr(sRefDes, nTableRow)
+    LookupFormula = "=IFERROR(INDEX(Harness!$" & sFromCol & "$7:$" & sFromCol & "$1006," & _
+        "MATCH(" & sKey & ",Harness!$L$7:$L$1006,0))," & _
+        "IFERROR(INDEX(Harness!$" & sToCol & "$7:$" & sToCol & "$1006," & _
+        "MATCH(" & sKey & ",Harness!$M$7:$M$1006,0)),""""))"
+End Function
+
+Public Function WireToFormula(ByVal sRefDes As String, ByVal nTableRow As Long) As String
+    Dim sKey As String
+    sKey = KeyExpr(sRefDes, nTableRow)
+    WireToFormula = "=IFERROR(INDEX(Harness!$I$7:$I$1006,MATCH(" & sKey & ",Harness!$L$7:$L$1006,0))&""-""&" & _
+        "INDEX(Harness!$J$7:$J$1006,MATCH(" & sKey & ",Harness!$L$7:$L$1006,0))," & _
+        "IFERROR(INDEX(Harness!$A$7:$A$1006,MATCH(" & sKey & ",Harness!$M$7:$M$1006,0))&""-""&" & _
+        "INDEX(Harness!$B$7:$B$1006,MATCH(" & sKey & ",Harness!$M$7:$M$1006,0)),""""))"
+End Function
