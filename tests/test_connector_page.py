@@ -167,3 +167,25 @@ def test_wire_to_formula_combines_ref_des_and_pin(wb):
         'IFERROR(INDEX(Harness!$A$7:$A$1006,MATCH("J1|"&$J2,Harness!$M$7:$M$1006,0))&"-"&'
         'INDEX(Harness!$B$7:$B$1006,MATCH("J1|"&$J2,Harness!$M$7:$M$1006,0)),""))'
     )
+
+
+def test_write_live_formulas_fills_every_row(wb, app):
+    dest = app.Workbooks.Add()
+    try:
+        ws = dest.Worksheets(1)
+        pins = (
+            ("DTM-04P", 1, "+12V", 0.1, 0.1, 0.1, 0.1),
+            ("DTM-04P", 2, "GND", 0.9, 0.1, 0.9, 0.1),
+        )
+        run(wb, "modConnectorPage.WriteTableSkeleton", ws, pins)
+        run(wb, "modConnectorPage.WriteLiveFormulas", ws, "J1", pins)
+
+        assert ws.Cells(2, 12).Formula == run(wb, "modConnectorPage.WireToFormula", "J1", 2)
+        assert ws.Cells(2, 13).Formula == run(wb, "modConnectorPage.LookupFormula", "D", "D", "J1", 2)
+        assert ws.Cells(2, 14).Formula == run(wb, "modConnectorPage.LookupFormula", "E", "E", "J1", 2)
+        assert ws.Cells(2, 15).Formula == run(wb, "modConnectorPage.LookupFormula", "F", "F", "J1", 2)
+        assert ws.Cells(2, 16).Formula == run(wb, "modConnectorPage.LookupFormula", "C", "H", "J1", 2)
+        assert ws.Cells(2, 17).Formula == run(wb, "modConnectorPage.LookupFormula", "G", "G", "J1", 2)
+        assert ws.Cells(3, 12).Formula == run(wb, "modConnectorPage.WireToFormula", "J1", 3)
+    finally:
+        dest.Close(SaveChanges=False)

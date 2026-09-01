@@ -183,3 +183,20 @@ Public Function WireToFormula(ByVal sRefDes As String, ByVal nTableRow As Long) 
         "IFERROR(INDEX(Harness!$A$7:$A$1006,MATCH(" & sKey & ",Harness!$M$7:$M$1006,0))&""-""&" & _
         "INDEX(Harness!$B$7:$B$1006,MATCH(" & sKey & ",Harness!$M$7:$M$1006,0)),""""))"
 End Function
+
+Public Sub WriteLiveFormulas(wsPage As Worksheet, ByVal sRefDes As String, vPins As Variant)
+    Dim i As Long, r As Long
+
+    If IsEmpty(vPins) Then Exit Sub
+
+    For i = LBound(vPins, 1) To UBound(vPins, 1)
+        r = CONN_TABLE_FIRST_ROW + (i - LBound(vPins, 1))
+
+        wsPage.Cells(r, CONN_TABLE_FIRST_COL + 2).Formula = WireToFormula(sRefDes, r)
+        wsPage.Cells(r, CONN_TABLE_FIRST_COL + 3).Formula = LookupFormula("D", "D", sRefDes, r)
+        wsPage.Cells(r, CONN_TABLE_FIRST_COL + 4).Formula = LookupFormula("E", "E", sRefDes, r)
+        wsPage.Cells(r, CONN_TABLE_FIRST_COL + 5).Formula = LookupFormula("F", "F", sRefDes, r)
+        wsPage.Cells(r, CONN_TABLE_FIRST_COL + 6).Formula = LookupFormula("C", "H", sRefDes, r)
+        wsPage.Cells(r, CONN_TABLE_FIRST_COL + 7).Formula = LookupFormula("G", "G", sRefDes, r)
+    Next i
+End Sub

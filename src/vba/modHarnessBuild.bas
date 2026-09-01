@@ -142,6 +142,7 @@ Public Sub BuildConnectorPages(destWb As Workbook, wsSnapshot As Worksheet)
         End If
 
         modConnectorPage.WriteTableSkeleton wsPage, vPins
+        modConnectorPage.WriteLiveFormulas wsPage, sRefDes, vPins
         modConnectorPage.WriteMetadata wsPage, sConnectorID
     Next i
 End Sub
