@@ -162,26 +162,47 @@ Public Sub WriteMetadata(wsPage As Worksheet, ByVal sConnectorID As String)
 End Sub
 
 Private Function KeyExpr(ByVal sRefDes As String, ByVal nTableRow As Long) As String
-    KeyExpr = """" & sRefDes & "|""&$J" & CStr(nTableRow)
+    Dim sEscaped As String
+    sEscaped = Replace(sRefDes, """", """""")
+    KeyExpr = """" & sEscaped & "|""&$J" & CStr(nTableRow)
 End Function
 
+' A matched-but-blank chart cell makes INDEX return an empty string, not an
+' error - so the outer IFERROR alone can't turn it into a blank pin-table
+' cell. Each branch below repeats its INDEX(...) sub-expression once for an
+' IF("" ...) blank test and once for the return value (Excel 2016 has no
+' LET() to name it once) so a successful-but-blank match still renders "".
 Public Function LookupFormula(ByVal sFromCol As String, ByVal sToCol As String, _
                               ByVal sRefDes As String, ByVal nTableRow As Long) As String
-    Dim sKey As String
+    Dim sKey As String, Q As String
+    Dim sFromIndex As String, sToIndex As String
     sKey = KeyExpr(sRefDes, nTableRow)
-    LookupFormula = "=IFERROR(INDEX(Harness!$" & sFromCol & "$7:$" & sFromCol & "$1006," & _
-        "MATCH(" & sKey & ",Harness!$L$7:$L$1006,0))," & _
-        "IFERROR(INDEX(Harness!$" & sToCol & "$7:$" & sToCol & "$1006," & _
-        "MATCH(" & sKey & ",Harness!$M$7:$M$1006,0)),""""))"
+    Q = """"
+
+    sFromIndex = "INDEX(Harness!$" & sFromCol & "$7:$" & sFromCol & "$1006," & _
+        "MATCH(" & sKey & ",Harness!$L$7:$L$1006,0))"
+    sToIndex = "INDEX(Harness!$" & sToCol & "$7:$" & sToCol & "$1006," & _
+        "MATCH(" & sKey & ",Harness!$M$7:$M$1006,0))"
+
+    LookupFormula = "=IFERROR(IF(" & sFromIndex & "=" & Q & Q & "," & Q & Q & "," & sFromIndex & ")," & _
+        "IFERROR(IF(" & sToIndex & "=" & Q & Q & "," & Q & Q & "," & sToIndex & ")," & Q & Q & "))"
 End Function
 
 Public Function WireToFormula(ByVal sRefDes As String, ByVal nTableRow As Long) As String
-    Dim sKey As String
+    Dim sKey As String, Q As String
+    Dim sFromConn As String, sFromPin As String, sToConn As String, sToPin As String
     sKey = KeyExpr(sRefDes, nTableRow)
-    WireToFormula = "=IFERROR(INDEX(Harness!$I$7:$I$1006,MATCH(" & sKey & ",Harness!$L$7:$L$1006,0))&""-""&" & _
-        "INDEX(Harness!$J$7:$J$1006,MATCH(" & sKey & ",Harness!$L$7:$L$1006,0))," & _
-        "IFERROR(INDEX(Harness!$A$7:$A$1006,MATCH(" & sKey & ",Harness!$M$7:$M$1006,0))&""-""&" & _
-        "INDEX(Harness!$B$7:$B$1006,MATCH(" & sKey & ",Harness!$M$7:$M$1006,0)),""""))"
+    Q = """"
+
+    sFromConn = "INDEX(Harness!$I$7:$I$1006,MATCH(" & sKey & ",Harness!$L$7:$L$1006,0))"
+    sFromPin = "INDEX(Harness!$J$7:$J$1006,MATCH(" & sKey & ",Harness!$L$7:$L$1006,0))"
+    sToConn = "INDEX(Harness!$A$7:$A$1006,MATCH(" & sKey & ",Harness!$M$7:$M$1006,0))"
+    sToPin = "INDEX(Harness!$B$7:$B$1006,MATCH(" & sKey & ",Harness!$M$7:$M$1006,0))"
+
+    WireToFormula = "=IFERROR(IF(OR(" & sFromConn & "=" & Q & Q & "," & sFromPin & "=" & Q & Q & ")," & Q & Q & "," & _
+        sFromConn & "&" & Q & "-" & Q & "&" & sFromPin & ")," & _
+        "IFERROR(IF(OR(" & sToConn & "=" & Q & Q & "," & sToPin & "=" & Q & Q & ")," & Q & Q & "," & _
+        sToConn & "&" & Q & "-" & Q & "&" & sToPin & ")," & Q & Q & "))"
 End Function
 
 Public Sub WriteLiveFormulas(wsPage As Worksheet, ByVal sRefDes As String, vPins As Variant)

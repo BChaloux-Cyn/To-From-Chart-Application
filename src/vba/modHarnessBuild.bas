@@ -11,6 +11,14 @@ Public Const XL_SHEET_VERY_HIDDEN As Long = 2
 
 Private Const TB_VALUE_CELLS As String = "B2,E2,H2,B3,E3,H3,B4,H4"
 
+' Test-only accessor: modConnectorPage's formula builders hardcode 7/1006 as
+' literal string fragments rather than referencing these constants (an
+' intentional choice - see the module's header), so a pytest tripwire needs
+' a way to read the live constant value to detect if the two ever drift.
+Public Function SavedChartLastRow() As Long
+    SavedChartLastRow = SAVED_CHART_LAST_ROW
+End Function
+
 Public Function BuildHarnessSheets(destWb As Workbook) As Boolean
     If destWb.Worksheets.Count <> 1 Then Exit Function
 

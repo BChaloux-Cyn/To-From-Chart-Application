@@ -146,27 +146,60 @@ def test_write_metadata_hides_the_connector_id_column(wb, app):
 def test_lookup_formula_for_a_direction_independent_column(wb):
     formula = run(wb, "modConnectorPage.LookupFormula", "D", "D", "J1", 2)
     assert formula == (
-        '=IFERROR(INDEX(Harness!$D$7:$D$1006,MATCH("J1|"&$J2,Harness!$L$7:$L$1006,0)),'
-        'IFERROR(INDEX(Harness!$D$7:$D$1006,MATCH("J1|"&$J2,Harness!$M$7:$M$1006,0)),""))'
+        '=IFERROR(IF(INDEX(Harness!$D$7:$D$1006,MATCH("J1|"&$J2,Harness!$L$7:$L$1006,0))="","",'
+        'INDEX(Harness!$D$7:$D$1006,MATCH("J1|"&$J2,Harness!$L$7:$L$1006,0))),'
+        'IFERROR(IF(INDEX(Harness!$D$7:$D$1006,MATCH("J1|"&$J2,Harness!$M$7:$M$1006,0))="","",'
+        'INDEX(Harness!$D$7:$D$1006,MATCH("J1|"&$J2,Harness!$M$7:$M$1006,0))),""))'
     )
 
 
 def test_lookup_formula_for_termination_uses_different_from_and_to_columns(wb):
     formula = run(wb, "modConnectorPage.LookupFormula", "C", "H", "J1", 3)
     assert formula == (
-        '=IFERROR(INDEX(Harness!$C$7:$C$1006,MATCH("J1|"&$J3,Harness!$L$7:$L$1006,0)),'
-        'IFERROR(INDEX(Harness!$H$7:$H$1006,MATCH("J1|"&$J3,Harness!$M$7:$M$1006,0)),""))'
+        '=IFERROR(IF(INDEX(Harness!$C$7:$C$1006,MATCH("J1|"&$J3,Harness!$L$7:$L$1006,0))="","",'
+        'INDEX(Harness!$C$7:$C$1006,MATCH("J1|"&$J3,Harness!$L$7:$L$1006,0))),'
+        'IFERROR(IF(INDEX(Harness!$H$7:$H$1006,MATCH("J1|"&$J3,Harness!$M$7:$M$1006,0))="","",'
+        'INDEX(Harness!$H$7:$H$1006,MATCH("J1|"&$J3,Harness!$M$7:$M$1006,0))),""))'
     )
 
 
 def test_wire_to_formula_combines_ref_des_and_pin(wb):
     formula = run(wb, "modConnectorPage.WireToFormula", "J1", 2)
     assert formula == (
-        '=IFERROR(INDEX(Harness!$I$7:$I$1006,MATCH("J1|"&$J2,Harness!$L$7:$L$1006,0))&"-"&'
-        'INDEX(Harness!$J$7:$J$1006,MATCH("J1|"&$J2,Harness!$L$7:$L$1006,0)),'
-        'IFERROR(INDEX(Harness!$A$7:$A$1006,MATCH("J1|"&$J2,Harness!$M$7:$M$1006,0))&"-"&'
-        'INDEX(Harness!$B$7:$B$1006,MATCH("J1|"&$J2,Harness!$M$7:$M$1006,0)),""))'
+        '=IFERROR(IF(OR(INDEX(Harness!$I$7:$I$1006,MATCH("J1|"&$J2,Harness!$L$7:$L$1006,0))="",'
+        'INDEX(Harness!$J$7:$J$1006,MATCH("J1|"&$J2,Harness!$L$7:$L$1006,0))=""),"",'
+        'INDEX(Harness!$I$7:$I$1006,MATCH("J1|"&$J2,Harness!$L$7:$L$1006,0))&"-"&'
+        'INDEX(Harness!$J$7:$J$1006,MATCH("J1|"&$J2,Harness!$L$7:$L$1006,0))),'
+        'IFERROR(IF(OR(INDEX(Harness!$A$7:$A$1006,MATCH("J1|"&$J2,Harness!$M$7:$M$1006,0))="",'
+        'INDEX(Harness!$B$7:$B$1006,MATCH("J1|"&$J2,Harness!$M$7:$M$1006,0))=""),"",'
+        'INDEX(Harness!$A$7:$A$1006,MATCH("J1|"&$J2,Harness!$M$7:$M$1006,0))&"-"&'
+        'INDEX(Harness!$B$7:$B$1006,MATCH("J1|"&$J2,Harness!$M$7:$M$1006,0))),""))'
     )
+
+
+def test_lookup_formula_row_bound_matches_saved_chart_last_row(wb):
+    # Cheap tripwire (not a refactor): LookupFormula/WireToFormula hardcode
+    # 7/1006 as literal string fragments rather than deriving them from
+    # modHarnessBuild.SAVED_CHART_FIRST_ROW/LAST_ROW. If that constant ever
+    # changes without the literal being updated to match, this test fails
+    # loudly instead of the two silently desyncing.
+    last_row = run(wb, "modHarnessBuild.SavedChartLastRow")
+    formula = run(wb, "modConnectorPage.LookupFormula", "D", "D", "J1", 2)
+    assert "$" + str(last_row) in formula
+
+
+def test_lookup_formula_escapes_embedded_double_quotes_in_ref_des(wb, app):
+    # modConnectors.RenameRefDes only validates non-empty/non-duplicate - it
+    # doesn't filter characters - so a RefDes containing a literal double
+    # quote must not produce a malformed formula that throws on assignment.
+    dest = app.Workbooks.Add()
+    try:
+        ws = dest.Worksheets(1)
+        formula = run(wb, "modConnectorPage.LookupFormula", "D", "D", 'J1"X', 2)
+        assert '"J1""X|"' in formula
+        ws.Cells(1, 1).Formula = formula  # must not raise
+    finally:
+        dest.Close(SaveChanges=False)
 
 
 def test_write_live_formulas_fills_every_row(wb, app):
