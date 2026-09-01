@@ -34,6 +34,10 @@ Public Function PlacePhoto(wsPage As Worksheet, ByVal sPhotoPath As String) As B
     Set shpProbe = wsPage.Shapes.AddPicture(sPhotoPath, False, True, 0, 0, -1, -1)
     Dim vFit As Variant
     vFit = modPinEditor.FitAspectRatio(shpProbe.Width, shpProbe.Height, CONN_PHOTO_MAX_WIDTH, CONN_PHOTO_MAX_HEIGHT)
+    If IsEmpty(vFit) Then
+        shpProbe.Delete
+        Exit Function
+    End If
 
     shpProbe.Left = CONN_PHOTO_LEFT
     shpProbe.Top = CONN_PHOTO_TOP
