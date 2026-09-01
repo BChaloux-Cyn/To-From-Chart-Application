@@ -137,5 +137,15 @@ def test_full_harness_round_trips_through_a_saved_file(wb, app, tmp_path):
         wsHarnessReopened.Cells(7, 5).Value = "Blue"  # hand-edit Color on the open, macro-free file
         assert j1.Cells(2, 14).Value == "Blue"
         assert j2.Cells(2, 14).Value == "Blue"
+
+        harness_ps = ws.PageSetup
+        assert harness_ps.Orientation == 2  # xlLandscape
+        assert harness_ps.PrintTitleRows == "$6:$6"
+        assert "HN-100" in harness_ps.CenterFooter
+
+        page_ps = j1.PageSetup
+        assert page_ps.Orientation == 1  # xlPortrait
+        assert page_ps.PrintTitleRows == ""
+        assert "HN-100" in page_ps.CenterFooter
     finally:
         reopened.Close(SaveChanges=False)
