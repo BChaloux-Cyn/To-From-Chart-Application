@@ -249,6 +249,26 @@ Public Function RemoveInstancesOfConnectorType(ByVal sConnectorID As String) As 
     RemoveInstancesOfConnectorType = vResult
 End Function
 
+Public Function AllInstances() As Variant
+    Dim ws As Worksheet
+    Dim r As Long, nLast As Long, n As Long, c As Long
+    Dim vResult() As Variant
+
+    Set ws = ThisWorkbook.Worksheets(CONN_SHEET)
+    nLast = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    If nLast < CONN_FIRST_ROW Then Exit Function
+
+    n = nLast - CONN_FIRST_ROW + 1
+    ReDim vResult(1 To n, 1 To 6)
+    For r = CONN_FIRST_ROW To nLast
+        For c = 1 To 6
+            vResult(r - CONN_FIRST_ROW + 1, c) = ws.Cells(r, c).Value
+        Next c
+    Next r
+
+    AllInstances = vResult
+End Function
+
 ' Everything shConnectors's Worksheet_Change decides. sPriorRefDes and
 ' nPriorRow come from the sheet module's SelectionChange bookkeeping, which
 ' is genuine event-lifecycle state and stays there. On rejection the

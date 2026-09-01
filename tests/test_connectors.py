@@ -95,3 +95,29 @@ def test_ref_des_dropdown_sees_added_connectors(wb):
     run(wb, "modConnectors.AddConnectorInstance",
         "GND-STUD", "Chassis ground stud", "", "Stud", 1)
     assert wb.Names("ListRefDes").RefersToRange.Rows.Count == 2
+
+
+def test_all_instances_returns_every_placed_connector(wb):
+    ws = wb.Worksheets("Connectors")
+    ws.Cells(2, 1).Value = "J1"
+    ws.Cells(2, 2).Value = "DTM-04P"
+    ws.Cells(2, 3).Value = "Deutsch DTM 4-way"
+    ws.Cells(2, 4).Value = "DTM06-4S"
+    ws.Cells(2, 5).Value = "Connector"
+    ws.Cells(2, 6).Value = 4
+    ws.Cells(3, 1).Value = "ST1"
+    ws.Cells(3, 2).Value = "GND-STUD"
+    ws.Cells(3, 3).Value = "Chassis Ground"
+    ws.Cells(3, 4).Value = ""
+    ws.Cells(3, 5).Value = "Stud"
+    ws.Cells(3, 6).Value = 1
+
+    result = run(wb, "modConnectors.AllInstances")
+    assert [row[0] for row in result] == ["J1", "ST1"]
+    assert result[0][1] == "DTM-04P"
+    assert int(result[1][5]) == 1
+
+
+def test_all_instances_returns_empty_when_nothing_is_placed(wb):
+    result = run(wb, "modConnectors.AllInstances")
+    assert result is None
