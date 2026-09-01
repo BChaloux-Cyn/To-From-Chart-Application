@@ -277,6 +277,7 @@ HOME_BUTTONS = [
     ("New Harness", "modChart.NewHarness", 20, 220, 120, 32),
     ("Save Harness", "modHarnessUI.SaveHarness", 150, 220, 120, 32),
     ("Save Harness As", "modHarnessUI.SaveHarnessAs", 280, 220, 120, 32),
+    ("Open Harness", "modHarnessUI.OpenHarness", 410, 220, 120, 32),
     ("Add Connector", "modConnectorUI.ShowAddConnector", 20, 260, 120, 32),
     ("Remove Connector", "modConnectorUI.ShowRemoveConnector", 150, 260, 130, 32),
     ("Manage Library", "modConnectorUI.ShowManageLibrary", 20, 300, 120, 32),

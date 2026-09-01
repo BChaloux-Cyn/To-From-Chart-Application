@@ -48,3 +48,19 @@ Private Function DefaultFileName() As String
         DefaultFileName = sNumber & ".xlsx"
     End If
 End Function
+
+Public Sub OpenHarness()
+    Dim vPath As Variant
+    vPath = Application.GetOpenFilename(FileFilter:="Excel Workbook (*.xlsx), *.xlsx")
+    If vPath = False Then Exit Sub
+
+    Dim srcWb As Workbook
+    Set srcWb = Workbooks.Open(CStr(vPath))
+
+    Dim vResult As Variant
+    vResult = modHarnessActions.LoadHarness(srcWb)
+
+    srcWb.Close SaveChanges:=False
+
+    MsgBox modMessages.MessageFor(vResult), modMessages.MessageStyleFor(vResult)
+End Sub
