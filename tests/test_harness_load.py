@@ -52,3 +52,51 @@ def test_copy_title_block_values_updates_length_units_header(wb, app):
         assert wsDest.Cells(6, 7).Value == "Length (mm)"
     finally:
         srcWb.Close(SaveChanges=False)
+
+
+def test_copy_chart_values_round_trips_and_counts_used_rows(wb, app):
+    srcWb = app.Workbooks.Add()
+    try:
+        run(wb, "modHarnessBuild.BuildHarnessSheets", srcWb)
+        wsSrc = srcWb.Worksheets("Harness")
+        wsSrc.Cells(7, 1).Value = "J1"
+        wsSrc.Cells(7, 9).Value = "J2"
+        wsSrc.Cells(10, 1).Value = "J1"
+        wsSrc.Cells(10, 9).Value = "J2"
+
+        wsDest = wb.Worksheets("Harness")
+        n = run(wb, "modHarnessLoad.CopyChartValues", wsSrc, wsDest)
+
+        assert n == 2
+        assert wsDest.Cells(7, 1).Value == "J1"
+        assert wsDest.Cells(10, 9).Value == "J2"
+    finally:
+        srcWb.Close(SaveChanges=False)
+
+
+def test_rebuild_connector_instances_reads_ref_des_from_sheet_names(wb, app, tmp_path):
+    srcWb = app.Workbooks.Add()
+    try:
+        run(wb, "modHarnessBuild.BuildHarnessSheets", srcWb)
+        wsSnap = srcWb.Worksheets("_Snapshot")
+        fields = ("DTM-04P", "Deutsch DTM 4-way", "Deutsch", "DTM06-4S", "Connector",
+                  4, "", "PHOTO_DTM-04P", "2026-08-26T00:00:00Z", "2026-08-26T00:00:00Z", "Local")
+        run(wb, "modLibrary.WriteConnector", wsSnap, 2, 201, fields)
+
+        page = srcWb.Worksheets.Add(After=srcWb.Worksheets(srcWb.Worksheets.Count))
+        page.Name = "CONN_J1"
+        run(wb, "modConnectorPage.WriteMetadata", page, "DTM-04P")
+
+        wsDestSnap = wb.Worksheets("_Snapshot")
+        run(wb, "modHarnessLoad.CopySnapshotInto", wsSnap, wsDestSnap)
+
+        wsDestConn = wb.Worksheets("Connectors")
+        n = run(wb, "modHarnessLoad.RebuildConnectorInstances", srcWb, wsDestSnap, wsDestConn)
+
+        assert n == 1
+        assert wsDestConn.Cells(2, 1).Value == "J1"
+        assert wsDestConn.Cells(2, 2).Value == "DTM-04P"
+        assert wsDestConn.Cells(2, 3).Value == "Deutsch DTM 4-way"
+        assert int(wsDestConn.Cells(2, 6).Value) == 4
+    finally:
+        srcWb.Close(SaveChanges=False)
