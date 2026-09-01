@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from tests.conftest import run
 from tests.fixtures.sample_photo import write_sample_photo
 
@@ -148,3 +150,43 @@ def test_copy_snapshot_round_trips_connectors_pins_and_photos(wb, app, tmp_path)
         assert wsDest.Shapes("PHOTO_DTM-04P").Name == "PHOTO_DTM-04P"
     finally:
         dest.Close(SaveChanges=False)
+
+
+def test_build_connector_pages_creates_one_sheet_per_instance(wb, app, tmp_path):
+    conn_ws = wb.Worksheets("Connectors")
+    conn_ws.Cells(2, 1).Value = "J1"
+    conn_ws.Cells(2, 2).Value = "DTM-04P"
+    conn_ws.Cells(2, 3).Value = "Deutsch DTM 4-way"
+    conn_ws.Cells(2, 5).Value = "Connector"
+    conn_ws.Cells(2, 6).Value = 2
+
+    wsSnap = wb.Worksheets("_Snapshot")
+    fields = ("DTM-04P", "Deutsch DTM 4-way", "Deutsch", "DTM06-4S", "Connector",
+              2, "", "PHOTO_DTM-04P", "2026-08-26T00:00:00Z", "2026-08-26T00:00:00Z", "Local")
+    run(wb, "modLibrary.WriteConnector", wsSnap, 2, 201, fields)
+    run(wb, "modLibrary.WritePin", wsSnap, 211, 2210, ("DTM-04P", 1, "+12V", 0.1, 0.1, 0.1, 0.1))
+    run(wb, "modLibrary.WritePin", wsSnap, 211, 2210, ("DTM-04P", 2, "GND", 0.9, 0.1, 0.9, 0.1))
+    photo_path = write_sample_photo(tmp_path / "photo.png")
+    run(wb, "modLibrary.EmbedConnectorPhoto", wsSnap, "DTM-04P", str(photo_path))
+
+    # BuildConnectorPages looks in LibraryFolder() (ThisWorkbook.Path, not
+    # tmp_path) for the photo cache - a real path alongside the built
+    # artifact, not test-isolated - see test_snapshot.py's identical seeding.
+    library_folder = run(wb, "modSnapshot.LibraryFolder")
+    cache_path = Path(library_folder) / "Photos" / "DTM-04P.png"
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    write_sample_photo(cache_path)
+
+    dest = app.Workbooks.Add()
+    try:
+        run(wb, "modHarnessBuild.BuildHarnessSheets", dest)
+        run(wb, "modHarnessBuild.CopySnapshot", dest.Worksheets("_Snapshot"))
+        run(wb, "modHarnessBuild.BuildConnectorPages", dest, dest.Worksheets("_Snapshot"))
+
+        page = dest.Worksheets("CONN_J1")
+        assert page.Cells(1, 27).Value == "DTM-04P"
+        assert page.Cells(1, 10).Value == "Pin"
+        assert page.Shapes.Count >= 2  # at least the two ovals
+    finally:
+        dest.Close(SaveChanges=False)
+        cache_path.unlink(missing_ok=True)

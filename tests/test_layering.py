@@ -5,6 +5,7 @@ import pytest
 LAYER0 = [
     "modUtil", "modState", "modLibrary", "modChart", "modConnectors",
     "modSnapshot", "modLibraryTransfer", "modPinEditor", "modHarnessBuild",
+    "modConnectorPage",
 ]
 LAYER1 = [
     "modContract", "modMessages", "modEditorActions", "modPickerActions",

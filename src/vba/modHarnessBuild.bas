@@ -114,3 +114,34 @@ Public Sub CopySnapshot(wsDestSnapshot As Worksheet)
         wsDestSnapshot.Shapes(wsDestSnapshot.Shapes.Count).Name = shp.Name
     Next shp
 End Sub
+
+Public Sub BuildConnectorPages(destWb As Workbook, wsSnapshot As Worksheet)
+    Dim vInstances As Variant, i As Long
+    Dim sRefDes As String, sConnectorID As String
+    Dim wsPage As Worksheet, vPins As Variant, shpPhoto As Shape
+    Dim sPhotoPath As String
+
+    vInstances = modConnectors.AllInstances()
+    If IsEmpty(vInstances) Then Exit Sub
+
+    For i = LBound(vInstances, 1) To UBound(vInstances, 1)
+        sRefDes = CStr(vInstances(i, 1))
+        sConnectorID = CStr(vInstances(i, 2))
+
+        Set wsPage = destWb.Worksheets.Add(After:=destWb.Worksheets(destWb.Worksheets.Count))
+        wsPage.Name = "CONN_" & sRefDes
+
+        vPins = modLibrary.ReadPinsForConnector(wsSnapshot, modSnapshot.SNAP_PINS_FIRST_ROW, _
+            modSnapshot.SNAP_PINS_LAST_ROW, sConnectorID)
+
+        sPhotoPath = modConnectorPage.PagePhotoPath(modSnapshot.LibraryFolder(), sConnectorID)
+        If modConnectorPage.PlacePhoto(wsPage, sPhotoPath) Then
+            Set shpPhoto = wsPage.Shapes("PAGE_PHOTO")
+            modConnectorPage.PlaceCallouts wsPage, shpPhoto, vPins
+            modConnectorPage.PlaceLeaderLines wsPage, shpPhoto, vPins
+        End If
+
+        modConnectorPage.WriteTableSkeleton wsPage, vPins
+        modConnectorPage.WriteMetadata wsPage, sConnectorID
+    Next i
+End Sub
