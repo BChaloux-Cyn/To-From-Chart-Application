@@ -43,6 +43,10 @@ Public Function MessageFor(vResult As Variant) As String
             MessageFor = "Saved. " & CStr(vPayload) & " wire(s) written."
         Case "HARNESS_SAVE_FAILED"
             MessageFor = "Could not save the harness: " & CStr(vPayload) & "."
+        Case "HARNESS_LOADED"
+            MessageFor = "Loaded. " & CStr(vPayload) & " wire(s) read."
+        Case "HARNESS_LOAD_FAILED"
+            MessageFor = "Could not load the harness: " & CStr(vPayload) & "."
         Case Else
             MessageFor = ""
     End Select

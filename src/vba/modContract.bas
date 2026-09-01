@@ -25,7 +25,7 @@ Public Function OutcomeCodes() As Variant
         "RENAMED", "RENAME_REJECTED", "NO_RENAME", _
         "BULK_REBUILT", "CELLS_REBUILT", "UNITS_SET", _
         "INSTANCE_REMOVED", "INSTANCE_NOT_FOUND", _
-        "HARNESS_SAVED", "HARNESS_SAVE_FAILED")
+        "HARNESS_SAVED", "HARNESS_SAVE_FAILED", "HARNESS_LOADED", "HARNESS_LOAD_FAILED")
 End Function
 
 ' One code maps to exactly one payload kind. PIN_DELETED and
@@ -50,6 +50,10 @@ Public Function PayloadKind(ByVal sOutcome As String) As String
         Case "HARNESS_SAVED"
             PayloadKind = KIND_LONG
         Case "HARNESS_SAVE_FAILED"
+            PayloadKind = KIND_STRING
+        Case "HARNESS_LOADED"
+            PayloadKind = KIND_LONG
+        Case "HARNESS_LOAD_FAILED"
             PayloadKind = KIND_STRING
         Case "CONNECTOR_DELETED_CASCADED", "CONNECTOR_IMPORTED_CASCADED"
             PayloadKind = KIND_TABLE

@@ -67,3 +67,11 @@ def test_harness_saved_declares_a_long_payload(wb):
 
 def test_harness_save_failed_declares_a_string_payload(wb):
     assert run(wb, "modContract.PayloadKind", "HARNESS_SAVE_FAILED") == "STRING"
+
+
+def test_harness_loaded_declares_a_long_payload(wb):
+    assert run(wb, "modContract.PayloadKind", "HARNESS_LOADED") == "LONG"
+
+
+def test_harness_load_failed_declares_a_string_payload(wb):
+    assert run(wb, "modContract.PayloadKind", "HARNESS_LOAD_FAILED") == "STRING"

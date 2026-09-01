@@ -85,3 +85,14 @@ def test_message_for_harness_save_failed(wb):
     result = run(wb, "modContract.Failure", "HARNESS_SAVE_FAILED", "destination workbook is not fresh")
     assert run(wb, "modMessages.MessageFor", result) == \
         "Could not save the harness: destination workbook is not fresh."
+
+
+def test_message_for_harness_loaded(wb):
+    result = run(wb, "modContract.Success", "HARNESS_LOADED", 5)
+    assert run(wb, "modMessages.MessageFor", result) == "Loaded. 5 wire(s) read."
+
+
+def test_message_for_harness_load_failed(wb):
+    result = run(wb, "modContract.Failure", "HARNESS_LOAD_FAILED", "not a harness file")
+    assert run(wb, "modMessages.MessageFor", result) == \
+        "Could not load the harness: not a harness file."
