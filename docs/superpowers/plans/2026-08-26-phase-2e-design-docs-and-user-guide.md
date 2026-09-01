@@ -8,7 +8,9 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-26-harness-creator-design.md`
 
-**Depends on:** 2a, 2b, 2c, and 2d **implemented and merged**, not merely planned. Do not start this plan's tasks until all four are green on `master` - a design doc written against plans rather than code will describe intentions, not behavior, and the whole point of writing this last is to avoid that.
+**Existing documentation to build on, not duplicate:** `docs/design/` (`00_purpose_scope.md` through `04_enforcement.md`) already documents the layer 0/1/2 split, the `modContract` result envelope, handler-lifecycle discipline, and the automated checks in `tests/test_layering.py` - all added by the UI/logic-separation work after this plan was written. Every per-subsystem doc in Task 2 should link into that structure for those cross-cutting conventions (see each step's guidance below) rather than re-explaining them, and should describe the subsystem in terms of where its code now sits in that layering (which layer 0 primitives, which layer 1 action module, which `.evt` adapters) instead of the pre-refactor form/module split this plan was originally scoped against.
+
+**Depends on:** 2a, 2b, 2c, and 2d **implemented and merged**, not merely planned, *and* the UI/logic-separation plan (`docs/superpowers/plans/2026-08-28-ui-logic-separation.md`) merged as well - it restructured 2a-2d's code into the layer 0/1/2 split `docs/design/` now documents, so a doc written against the pre-separation structure would already be describing dead code. Do not start this plan's tasks until all of these are green on `master` - a design doc written against plans rather than code will describe intentions, not behavior, and the whole point of writing this last is to avoid that.
 
 **Part of Phase 2** (2a-2d cover the implementation; this is 2e, the last sub-plan).
 
@@ -28,23 +30,28 @@
 | `docs/superpowers/specs/2026-08-26-phase-2d-import-export-design.md` | What 2d actually built: collision-safe import, the clipboard-photo-copy risk and its fallback |
 | `docs/student-guide.md` | Plain-language guide to the Creator as it stands after Phase 2 |
 | `README.md` | Modified: Status section updated to reflect Phase 2 |
+| `docs/design/00_purpose_scope.md` through `04_enforcement.md` | **Not modified by this plan** - existing cross-cutting layering reference, linked from each Task 2 doc rather than duplicated |
 
 ---
 
 ### Task 1: Verify what actually shipped
 
 **Files:**
-- Read-only: everything under `build/`, `src/vba/`, `tests/`.
+- Read-only: everything under `build/`, `src/vba/`, `tests/`, `docs/design/`.
 
 **Interfaces:**
-- Consumes: the merged state of 2a-2d.
+- Consumes: the merged state of 2a-2d and the UI/logic-separation plan.
 - Produces: a working list (not a file - just this task's own output, carried into Tasks 2-3) of every function, sheet, and form actually present, to write the remaining tasks against.
 
-- [ ] **Step 1: Diff plan against reality**
+- [ ] **Step 1: Read the current layering reference first**
 
-For each of 2a, 2b, 2c, 2d: read the actual current `src/vba/*.bas`, `src/vba/*.cls`, `src/vba/forms/*.evt`, `src/vba/sheets/*.evt`, and `build/*.py`, and compare against that sub-plan's document. Note every place execution deviated from the plan (a renamed function, a different bound, a task that got merged or split differently) - these deviations, not the plan text, are what Tasks 2-3 must describe.
+Read `docs/design/00_purpose_scope.md` through `04_enforcement.md` before touching the sub-plans. They already describe the layer 0/1/2 split, the `modContract` envelope, and handler-lifecycle rules that now sit on top of everything 2a-2d built. Treat this as the current architecture, not optional background - it tells you which module each piece of 2a-2d logic actually lives in today.
 
-- [ ] **Step 2: Run the full suite as a sanity check**
+- [ ] **Step 2: Diff plan against reality**
+
+For each of 2a, 2b, 2c, 2d: read the actual current `src/vba/*.bas`, `src/vba/*.cls`, `src/vba/forms/*.evt`, `src/vba/sheets/*.evt`, and `build/*.py`, and compare against that sub-plan's document. Note every place execution deviated from the plan - a renamed function, a different bound, a task that got merged or split differently, *and* every place logic that sub-plan describes as living in a form or sheet module has since moved into a layer 1 action module (`modEditorActions`, `modPickerActions`, `modManageActions`) per the UI/logic-separation plan. These deviations, not the plan text, are what Tasks 2-3 must describe.
+
+- [ ] **Step 3: Run the full suite as a sanity check**
 
 Run:
 
@@ -54,7 +61,7 @@ python -m pytest -v
 
 Expected: all passed. If it is not green, stop - fix or triage that first. A design doc written against a red suite is documenting a broken state as if it were finished.
 
-- [ ] **Step 3: Commit nothing yet**
+- [ ] **Step 4: Commit nothing yet**
 
 This task produces no file changes - it is the reading pass that grounds Tasks 2 and 3. Proceed directly to Task 2.
 
@@ -72,23 +79,23 @@ This task produces no file changes - it is the reading pass that grounds Tasks 2
 - Consumes: Task 1's reading pass.
 - Produces: four design docs, one per subsystem.
 
-Each doc follows the same shape as the project's existing spec (`docs/superpowers/specs/2026-08-26-harness-creator-design.md`) - prose sections with tables where the source is tabular, not a copy of the implementation plan's task list. A reader who never saw the plan should be able to understand the subsystem's shape, its key decisions, and where to find its code.
+Each doc follows the same shape as the project's existing spec (`docs/superpowers/specs/2026-08-26-harness-creator-design.md`) - prose sections with tables where the source is tabular, not a copy of the implementation plan's task list. A reader who never saw the plan should be able to understand the subsystem's shape, its key decisions, and where to find its code. For the layer 0/1/2 split, the result envelope, and handler-lifecycle rules, link to the relevant `docs/design/*.md` file instead of re-explaining them - these docs describe how each subsystem uses that architecture, not the architecture itself.
 
 - [ ] **Step 1: Write the 2a doc**
 
-Create `docs/superpowers/specs/2026-08-26-phase-2a-library-core-design.md` covering: the three-table schema and where each table lives (`dist/ConnectorLibrary.xlsx`'s `Connectors`/`Pins`/`Photos` sheets); the bounded-window `(nFirstRow, nLastRow)` convention in `modLibrary.bas` and why it exists (reused unchanged by `_Snapshot` in 2c, which shares a sheet with another table - a whole-sheet `Cells(Rows.Count,...).End(xlUp)` idiom would corrupt that); `LastUsedRowInWindow`'s specific bug (an occupied `nLastRow` overshoots) and why it is `Public`; the field-order-array convention for every record type and why no VBA `Type` crosses `Application.Run`; the photo grid and cache-path scheme. Cite file:line for each claim.
+Create `docs/superpowers/specs/2026-08-26-phase-2a-library-core-design.md` covering: the three-table schema and where each table lives (`dist/ConnectorLibrary.xlsx`'s `Connectors`/`Pins`/`Photos` sheets); the bounded-window `(nFirstRow, nLastRow)` convention in `modLibrary.bas` and why it exists (reused unchanged by `_Snapshot` in 2c, which shares a sheet with another table - a whole-sheet `Cells(Rows.Count,...).End(xlUp)` idiom would corrupt that); `LastUsedRowInWindow`'s specific bug (an occupied `nLastRow` overshoots) and why it is `Public`; the field-order-array convention for every record type and why no VBA `Type` crosses `Application.Run`; the photo grid and cache-path scheme. Cite file:line for each claim. `modLibrary.bas` is a layer 0 primitives module per `docs/design/01_architecture_overview.md` - note that in passing, but this doc's focus is the schema and storage conventions themselves, which sit below and are unaffected by the layering added on top.
 
 - [ ] **Step 2: Write the 2b doc**
 
-Create `docs/superpowers/specs/2026-08-26-phase-2b-connector-editor-design.md` covering: why UserForms are built via the VBIDE `Designer` object model in `build/form_layout.py` rather than a static `.frm` file; the `_Edit` scratch sheet and why in-progress pin edits live there instead of an in-memory structure; the `modPinEditor.bas` / `frmConnectorEditor.evt` split (all logic testable via `Application.Run`, all UI wiring untestable and manually verified); the anchor-versus-marker distinction and exactly which fields each gesture touches; the `clsPinMarker` `WithEvents`-per-instance pattern and why a form cannot statically `WithEvents` N runtime controls; the deliberate limitation that `mConnectorID` is fixed at photo-load time.
+Create `docs/superpowers/specs/2026-08-26-phase-2b-connector-editor-design.md` covering: why UserForms are built via the VBIDE `Designer` object model in `build/form_layout.py` rather than a static `.frm` file; the `_Edit` scratch sheet and why in-progress pin edits live there instead of an in-memory structure; the current three-way split across `modPinEditor.bas` (layer 0 primitives), `modEditorActions.bas` (layer 1 - the photo guard, cache source, click/place/delete/pin-number actions and queries, all tested via `Application.Run`) and `frmConnectorEditor.evt` (layer 2 - the thin adapter that reads controls, calls one `modEditorActions` function, and writes controls; this is the only piece manually verified rather than tested) - see `docs/design/01_architecture_overview.md` for what "layer" means here; the anchor-versus-marker distinction and exactly which fields each gesture touches; the `clsPinMarker` `WithEvents`-per-instance pattern and why a form cannot statically `WithEvents` N runtime controls; the deliberate limitation that `mConnectorID` is fixed at photo-load time.
 
 - [ ] **Step 3: Write the 2c doc**
 
-Create `docs/superpowers/specs/2026-08-26-phase-2c-picker-and-snapshot-design.md` covering: `_Snapshot`'s three fixed regions and their row bounds, and why one sheet rather than three; `SnapshotConnector`'s idempotency (frozen once per ConnectorID, not per ref des instance); the `SelectionChange`-caches-prior-value technique `RenameRefDes` depends on and why a plain `Worksheet_Change` cannot detect a rename on its own; the picker/browser split (Add Connector versus Manage Library) and why each button calls exactly one already-tested function.
+Create `docs/superpowers/specs/2026-08-26-phase-2c-picker-and-snapshot-design.md` covering: `_Snapshot`'s three fixed regions and their row bounds, and why one sheet rather than three; `SnapshotConnector`'s idempotency (frozen once per ConnectorID, not per ref des instance); the `SelectionChange`-caches-prior-value technique `RenameRefDes` depends on and why a plain `Worksheet_Change` cannot detect a rename on its own; the picker/browser split (Add Connector versus Manage Library) and why each button now calls exactly one `modPickerActions` or `modManageActions` function (layer 1) rather than doing the work itself - `docs/design/04_enforcement.md` names the test that holds this invariant (`test_every_click_handler_delegates`).
 
 - [ ] **Step 4: Write the 2d doc**
 
-Create `docs/superpowers/specs/2026-08-26-phase-2d-import-export-design.md` covering: `ImportConnector`'s collision-safe rename and Origin-field stamping; the `Shape.Copy`/`Paste` clipboard mechanism `CopyConnectorPhoto` uses and why it is the one part of this codebase with an honestly uncertain reliability profile in headless automation; **the actual outcome of Task 1's Step 6 manual verification** - state plainly whether headless clipboard photo-copy worked in this environment or not, since that determines whether the extraction-failure fallback is the common path or a rare one in practice.
+Create `docs/superpowers/specs/2026-08-26-phase-2d-import-export-design.md` covering: `ImportConnector`'s collision-safe rename and Origin-field stamping, and how that has since been extended into the Keep/Overwrite conflict prompt and delete-cascade behavior driven by `modManageActions`/`modLibraryTransfer` (layer 1) and reported through `modContract`'s `IMPORTED`/`EXPORTED` outcome codes and `modMessages`' text for them (see `docs/design/02_layering_rules.md`); the `Shape.Copy`/`Paste` clipboard mechanism `CopyConnectorPhoto` uses and why it is the one part of this codebase with an honestly uncertain reliability profile in headless automation - `tests/test_snapshot.py`'s own comments and `modSnapshot.SnapshotConnector`'s fallback-of-last-resort ordering document the same conclusion for the sibling photo-export path, worth cross-referencing; **the actual outcome of Task 1's Step 6 manual verification** - state plainly whether headless clipboard photo-copy worked in this environment or not, since that determines whether the extraction-failure fallback is the common path or a rare one in practice.
 
 - [ ] **Step 5: Cross-check every doc against Task 1's deviation notes**
 
@@ -141,10 +148,11 @@ Phase 1 complete: build system, Creator shell, to-from chart with dependent
 pin dropdowns. Phase 2 complete: connector library file and reader/writer,
 the connector editor with click-to-place pin markers, the connector picker,
 per-harness connector snapshots, ref des rename, and library import/export.
-See `docs/student-guide.md` for how to use what's built so far, and the
-`docs/superpowers/specs/` design docs for how it's built. Phases 3 and 4
-(harness save/load with rendered connector pages, validation and export)
-are specified but not yet built.
+See `docs/student-guide.md` for how to use what's built so far, the
+`docs/superpowers/specs/` design docs for each subsystem's decisions, and
+`docs/design/` for the layering rules the code follows day to day. Phases 3
+and 4 (harness save/load with rendered connector pages, validation and
+export) are specified but not yet built.
 ```
 
 - [ ] **Step 3: Verify the guide against the running application**
