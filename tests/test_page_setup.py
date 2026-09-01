@@ -48,3 +48,37 @@ def test_apply_harness_page_setup(wb, app):
         assert "&P" in ps.CenterFooter and "&N" in ps.CenterFooter
     finally:
         dest.Close(SaveChanges=False)
+
+
+def test_apply_connector_page_setup(wb, app):
+    dest = app.Workbooks.Add()
+    try:
+        ws = dest.Worksheets(1)
+        pins = (("DTM-04P", 1, "+12V", 0.1, 0.1, 0.1, 0.1),)
+        run(wb, "modConnectorPage.WriteTableSkeleton", ws, pins)
+
+        run(wb, "modPageSetup.ApplyConnectorPageSetup", ws, "HN-100", "A")
+
+        ps = ws.PageSetup
+        assert ps.Orientation == XL_PORTRAIT
+        assert ps.FitToPagesWide == 1
+        assert ps.FitToPagesTall == 1
+        assert ps.PrintArea == "$A$1:$Q$30"
+        assert ps.PrintTitleRows == ""
+        assert "HN-100" in ps.CenterFooter
+    finally:
+        dest.Close(SaveChanges=False)
+
+
+def test_apply_connector_page_setup_grows_past_the_minimum_for_a_large_pin_count(wb, app):
+    dest = app.Workbooks.Add()
+    try:
+        ws = dest.Worksheets(1)
+        pins = tuple(("DTM-64P", n, "", 0.1, 0.1, 0.1, 0.1) for n in range(1, 41))
+        run(wb, "modConnectorPage.WriteTableSkeleton", ws, pins)
+
+        run(wb, "modPageSetup.ApplyConnectorPageSetup", ws, "HN-100", "A")
+
+        assert ws.PageSetup.PrintArea == "$A$1:$Q$41"  # header + 40 pins
+    finally:
+        dest.Close(SaveChanges=False)

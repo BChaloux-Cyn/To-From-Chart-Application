@@ -1,6 +1,8 @@
 Attribute VB_Name = "modPageSetup"
 Option Explicit
 
+Public Const CONN_PAGE_MIN_PRINT_ROW As Long = 30
+
 Public Function LastUsedChartRow(wsHarness As Worksheet) As Long
     Dim r As Long
 
@@ -29,6 +31,25 @@ Public Sub ApplyHarnessPageSetup(wsHarness As Worksheet, ByVal sHarnessNumber As
         .Orientation = xlLandscape
         .FitToPagesWide = 1
         .FitToPagesTall = False
+        .Zoom = False
+        .CenterFooter = FooterText(sHarnessNumber, sRevision)
+    End With
+End Sub
+
+Private Function LastUsedTableRow(wsPage As Worksheet) As Long
+    Dim nTableLast As Long
+    nTableLast = wsPage.Cells(wsPage.Rows.Count, modConnectorPage.CONN_TABLE_FIRST_COL).End(xlUp).Row
+    If nTableLast < CONN_PAGE_MIN_PRINT_ROW Then nTableLast = CONN_PAGE_MIN_PRINT_ROW
+    LastUsedTableRow = nTableLast
+End Function
+
+Public Sub ApplyConnectorPageSetup(wsPage As Worksheet, ByVal sHarnessNumber As String, ByVal sRevision As String)
+    With wsPage.PageSetup
+        .PrintArea = "$A$1:$Q$" & CStr(LastUsedTableRow(wsPage))
+        .PrintTitleRows = ""
+        .Orientation = xlPortrait
+        .FitToPagesWide = 1
+        .FitToPagesTall = 1
         .Zoom = False
         .CenterFooter = FooterText(sHarnessNumber, sRevision)
     End With
