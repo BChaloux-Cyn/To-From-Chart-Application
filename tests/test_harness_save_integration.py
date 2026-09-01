@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from tests.conftest import run, run_action
 from tests.fixtures.sample_photo import write_sample_photo
 
@@ -26,6 +28,21 @@ def test_full_harness_round_trips_through_a_saved_file(wb, app, tmp_path):
     photo_path = write_sample_photo(tmp_path / "photo.png")
     run(wb, "modLibrary.EmbedConnectorPhoto", wsSnap, "DTM-04P", str(photo_path))
 
+    wsConn = wb.Worksheets("Connectors")
+    wsConn.Cells(2, 1).Value = "J1"
+    wsConn.Cells(2, 2).Value = "DTM-04P"
+    wsConn.Cells(2, 3).Value = "Deutsch DTM 4-way"
+    wsConn.Cells(2, 5).Value = "Connector"
+    wsConn.Cells(2, 6).Value = 4
+
+    # BuildConnectorPages looks in LibraryFolder() (ThisWorkbook.Path, not
+    # tmp_path) for the photo cache - a real path alongside the built
+    # artifact, not test-isolated - see test_snapshot.py's identical seeding.
+    library_folder = run(wb, "modSnapshot.LibraryFolder")
+    cache_path = Path(library_folder) / "Photos" / "DTM-04P.png"
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    write_sample_photo(cache_path)
+
     # Excel's COM Value property always reads numbers back as float (4 -> 4.0)
     # and an empty string written to a cell reads back as None (Excel treats
     # "" as clearing the cell to blank) - see test_library_connectors.py.
@@ -39,6 +56,7 @@ def test_full_harness_round_trips_through_a_saved_file(wb, app, tmp_path):
         dest.SaveAs(Filename=str(saved_path), FileFormat=51)
     finally:
         dest.Close(SaveChanges=False)
+        cache_path.unlink(missing_ok=True)
 
     # Reopen as a wholly separate file handle.
     reopened = app.Workbooks.Open(str(saved_path))
@@ -55,6 +73,14 @@ def test_full_harness_round_trips_through_a_saved_file(wb, app, tmp_path):
         result2 = run(wb, "modLibrary.ReadConnector", wsSnapDest, 2, 201, "DTM-04P")
         assert tuple(result2) == fields_round_tripped
         assert wsSnapDest.Shapes("PHOTO_DTM-04P").Name == "PHOTO_DTM-04P"
+
+        page = reopened.Worksheets("CONN_J1")
+        assert page.Cells(1, 27).Value == "DTM-04P"  # metadata cell, for 3e
+        assert page.Columns(27).Hidden is True
+        assert page.Shapes("PIN_1").Name == "PIN_1"
+        assert page.Cells(1, 10).Value == "Pin"
+        assert page.Cells(2, 10).Value == 1
+        assert page.Cells(2, 11).Value == "+12V"
 
         assert reopened.HasVBProject is False  # macro-free
     finally:
