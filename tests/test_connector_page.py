@@ -87,3 +87,25 @@ def test_place_callouts_centers_the_oval_on_the_label_position(wb, app, tmp_path
         assert abs((oval.Top + oval.Height / 2) - expected_center_y) < 0.5
     finally:
         dest.Close(SaveChanges=False)
+
+
+def test_leader_line_drawn_only_when_marker_is_pulled_off_anchor(wb, app, tmp_path):
+    photo_path = write_sample_photo(tmp_path / "photo.png")
+    dest = app.Workbooks.Add()
+    try:
+        ws = dest.Worksheets(1)
+        run(wb, "modConnectorPage.PlacePhoto", ws, str(photo_path))
+        shp = ws.Shapes("PAGE_PHOTO")
+
+        pins = (
+            ("DTM-04P", 1, "", 0.1, 0.1, 0.1, 0.1),   # marker on anchor: no leader
+            ("DTM-04P", 2, "", 0.9, 0.1, 0.3, 0.6),   # marker pulled away: leader
+        )
+        run(wb, "modConnectorPage.PlaceCallouts", ws, shp, pins)
+        run(wb, "modConnectorPage.PlaceLeaderLines", ws, shp, pins)
+
+        names = [ws.Shapes(i + 1).Name for i in range(ws.Shapes.Count)]
+        assert "LEADER_1" not in names
+        assert "LEADER_2" in names
+    finally:
+        dest.Close(SaveChanges=False)

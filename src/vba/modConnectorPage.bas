@@ -83,3 +83,49 @@ Public Function PlaceCallouts(wsPage As Worksheet, shpPhoto As Shape, vPins As V
 
     PlaceCallouts = n
 End Function
+
+Public Sub PlaceLeaderLines(wsPage As Worksheet, shpPhoto As Shape, vPins As Variant)
+    Dim i As Long, nPinNumber As Long
+    Dim dAnchorX As Double, dAnchorY As Double, dLabelX As Double, dLabelY As Double
+    Dim vAnchorPt As Variant, vMarkerPt As Variant
+    Dim dMarkerCx As Double, dMarkerCy As Double, dAnchorCx As Double, dAnchorCy As Double
+    Dim dDx As Double, dDy As Double, dDist As Double, dStartX As Double, dStartY As Double
+    Dim ln As Shape
+
+    If IsEmpty(vPins) Then Exit Sub
+
+    For i = LBound(vPins, 1) To UBound(vPins, 1)
+        nPinNumber = CLng(vPins(i, PinCol(vPins, modLibrary.PIN_COL_PINNUM)))
+        dAnchorX = CDbl(vPins(i, PinCol(vPins, modLibrary.PIN_COL_NORMX)))
+        dAnchorY = CDbl(vPins(i, PinCol(vPins, modLibrary.PIN_COL_NORMY)))
+        dLabelX = CDbl(vPins(i, PinCol(vPins, modLibrary.PIN_COL_LABELX)))
+        dLabelY = CDbl(vPins(i, PinCol(vPins, modLibrary.PIN_COL_LABELY)))
+
+        If modPinEditor.MarkerSitsOnAnchor(dAnchorX, dAnchorY, dLabelX, dLabelY) Then GoTo NextPin
+
+        vAnchorPt = modPinEditor.MarkerTopLeft(dAnchorX, dAnchorY, _
+            shpPhoto.Left, shpPhoto.Top, shpPhoto.Width, shpPhoto.Height, 0, 0)
+        vMarkerPt = modPinEditor.MarkerTopLeft(dLabelX, dLabelY, _
+            shpPhoto.Left, shpPhoto.Top, shpPhoto.Width, shpPhoto.Height, 0, 0)
+
+        dAnchorCx = vAnchorPt(0): dAnchorCy = vAnchorPt(1)
+        dMarkerCx = vMarkerPt(0): dMarkerCy = vMarkerPt(1)
+
+        dDx = dAnchorCx - dMarkerCx
+        dDy = dAnchorCy - dMarkerCy
+        dDist = Sqr(dDx * dDx + dDy * dDy)
+        If dDist > 0 Then
+            dStartX = dMarkerCx + (dDx / dDist) * (CONN_OVAL_DIAMETER / 2)
+            dStartY = dMarkerCy + (dDy / dDist) * (CONN_OVAL_DIAMETER / 2)
+        Else
+            dStartX = dMarkerCx
+            dStartY = dMarkerCy
+        End If
+
+        Set ln = wsPage.Shapes.AddLine(dStartX, dStartY, dAnchorCx, dAnchorCy)
+        ln.Name = "LEADER_" & CStr(nPinNumber)
+        ln.Line.Weight = 0.75
+
+NextPin:
+    Next i
+End Sub
