@@ -46,3 +46,44 @@ def test_place_photo_returns_false_for_a_missing_file(wb, app):
         assert ws.Shapes.Count == 0
     finally:
         dest.Close(SaveChanges=False)
+
+
+def test_place_callouts_draws_one_oval_per_pin(wb, app, tmp_path):
+    photo_path = write_sample_photo(tmp_path / "photo.png")
+    dest = app.Workbooks.Add()
+    try:
+        ws = dest.Worksheets(1)
+        run(wb, "modConnectorPage.PlacePhoto", ws, str(photo_path))
+        shp = ws.Shapes("PAGE_PHOTO")
+
+        pins = (
+            ("DTM-04P", 1, "+12V", 0.1, 0.1, 0.1, 0.1),
+            ("DTM-04P", 2, "GND", 0.9, 0.1, 0.9, 0.1),
+        )
+        n = run(wb, "modConnectorPage.PlaceCallouts", ws, shp, pins)
+        assert n == 2
+        assert ws.Shapes("PIN_1").Name == "PIN_1"
+        assert ws.Shapes("PIN_2").Name == "PIN_2"
+        assert ws.Shapes("PIN_1").TextFrame2.TextRange.Text == "1"
+    finally:
+        dest.Close(SaveChanges=False)
+
+
+def test_place_callouts_centers_the_oval_on_the_label_position(wb, app, tmp_path):
+    photo_path = write_sample_photo(tmp_path / "photo.png")
+    dest = app.Workbooks.Add()
+    try:
+        ws = dest.Worksheets(1)
+        run(wb, "modConnectorPage.PlacePhoto", ws, str(photo_path))
+        shp = ws.Shapes("PAGE_PHOTO")
+
+        pins = (("DTM-04P", 1, "", 0.5, 0.5, 0.5, 0.5),)
+        run(wb, "modConnectorPage.PlaceCallouts", ws, shp, pins)
+
+        oval = ws.Shapes("PIN_1")
+        expected_center_x = shp.Left + 0.5 * shp.Width
+        expected_center_y = shp.Top + 0.5 * shp.Height
+        assert abs((oval.Left + oval.Width / 2) - expected_center_x) < 0.5
+        assert abs((oval.Top + oval.Height / 2) - expected_center_y) < 0.5
+    finally:
+        dest.Close(SaveChanges=False)
