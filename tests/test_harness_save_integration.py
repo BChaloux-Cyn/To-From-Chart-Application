@@ -11,10 +11,12 @@ def test_full_harness_round_trips_through_a_saved_file(wb, app, tmp_path):
     wsHarness.Range("H2").Value = "A"
     wsHarness.Cells(7, 1).Value = "J1"
     wsHarness.Cells(7, 2).Value = 1
+    wsHarness.Cells(7, 3).Value = "Crimp Pin"      # From Term
     wsHarness.Cells(7, 4).Value = "12V_SW"
     wsHarness.Cells(7, 5).Value = "Red"
     wsHarness.Cells(7, 6).Value = "18"
     wsHarness.Cells(7, 7).Value = 24
+    wsHarness.Cells(7, 8).Value = "Ring Terminal"  # To Term
     wsHarness.Cells(7, 9).Value = "J2"
     wsHarness.Cells(7, 10).Value = 1
 
@@ -34,6 +36,14 @@ def test_full_harness_round_trips_through_a_saved_file(wb, app, tmp_path):
     wsConn.Cells(2, 3).Value = "Deutsch DTM 4-way"
     wsConn.Cells(2, 5).Value = "Connector"
     wsConn.Cells(2, 6).Value = 4
+
+    wsConn.Cells(3, 1).Value = "J2"
+    wsConn.Cells(3, 2).Value = "DTM-04P"
+    wsConn.Cells(3, 3).Value = "Deutsch DTM 4-way"
+    wsConn.Cells(3, 5).Value = "Connector"
+    wsConn.Cells(3, 6).Value = 4
+
+    run(wb, "modLibrary.WritePin", wsSnap, 211, 2210, ("DTM-04P", 2, "GND", 0.9, 0.1, 0.9, 0.1))
 
     # BuildConnectorPages looks in LibraryFolder() (ThisWorkbook.Path, not
     # tmp_path) for the photo cache - a real path alongside the built
@@ -81,6 +91,20 @@ def test_full_harness_round_trips_through_a_saved_file(wb, app, tmp_path):
         assert page.Cells(1, 10).Value == "Pin"
         assert page.Cells(2, 10).Value == 1
         assert page.Cells(2, 11).Value == "+12V"
+
+        j1 = reopened.Worksheets("CONN_J1")
+        assert j1.Cells(2, 13).Value == "12V_SW"   # Signal, matched as From
+        assert j1.Cells(2, 14).Value == "Red"       # Color
+        assert j1.Cells(2, 15).Value == 18           # AWG (Excel coerces the numeric-looking string to a number)
+        assert j1.Cells(2, 17).Value == 24           # Length
+        assert j1.Cells(2, 12).Value == "J2-1"      # Wire To, matched as From
+        assert j1.Cells(3, 12).Value == ""          # pin 2, unwired: blank, not an error
+
+        j2 = reopened.Worksheets("CONN_J2")
+        assert j2.Cells(2, 13).Value == "12V_SW"    # same wire, matched as To this time
+        assert j2.Cells(2, 12).Value == "J1-1"      # Wire To points back at J1
+        assert j1.Cells(2, 16).Value == "Crimp Pin"       # From side sees From Term
+        assert j2.Cells(2, 16).Value == "Ring Terminal"   # To side sees To Term
 
         assert reopened.HasVBProject is False  # macro-free
     finally:
