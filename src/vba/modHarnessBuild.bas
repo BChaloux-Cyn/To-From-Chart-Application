@@ -9,6 +9,8 @@ Public Const SAVED_COL_JOIN_TO As Long = 13
 
 Public Const XL_SHEET_VERY_HIDDEN As Long = 2
 
+Private Const TB_VALUE_CELLS As String = "B2,E2,H2,B3,E3,H3,B4,H4"
+
 Public Function BuildHarnessSheets(destWb As Workbook) As Boolean
     If destWb.Worksheets.Count <> 1 Then Exit Function
 
@@ -29,4 +31,60 @@ Public Function BuildHarnessSheets(destWb As Workbook) As Boolean
     wsSnapshot.Visible = XL_SHEET_VERY_HIDDEN
 
     BuildHarnessSheets = True
+End Function
+
+Public Sub CopyTitleBlock(wsDestHarness As Worksheet)
+    Dim wsSrc As Worksheet
+    Set wsSrc = ThisWorkbook.Worksheets(modChart.CHART_SHEET)
+
+    wsDestHarness.Range("A1").Value = "WIRE HARNESS TO-FROM CHART"
+    wsDestHarness.Range("A1").Font.Size = 16
+    wsDestHarness.Range("A1").Font.Bold = True
+
+    Dim vCells As Variant, i As Long, sCell As String
+    vCells = Split(TB_VALUE_CELLS, ",")
+    For i = LBound(vCells) To UBound(vCells)
+        sCell = CStr(vCells(i))
+        wsDestHarness.Range(sCell).Value = wsSrc.Range(sCell).Value
+        wsDestHarness.Range(sCell).Interior.Color = &HF2F2F2
+    Next i
+
+    Dim vHeaders As Variant, nUnitsIndex As Long
+    vHeaders = Array("From Conn", "From Pin", "From Term", "Signal", "Color", "AWG", _
+                      wsSrc.Cells(SAVED_CHART_HEADER_ROW, 7).Value, "To Term", "To Conn", "To Pin", "Notes")
+    For i = LBound(vHeaders) To UBound(vHeaders)
+        Dim cel As Range
+        Set cel = wsDestHarness.Cells(SAVED_CHART_HEADER_ROW, i + 1)
+        cel.Value = vHeaders(i)
+        cel.Font.Bold = True
+        cel.Interior.Color = &HD9D9D9
+    Next i
+End Sub
+
+Public Function CopyChartRows(wsDestHarness As Worksheet) As Long
+    Dim wsSrc As Worksheet
+    Set wsSrc = ThisWorkbook.Worksheets(modChart.CHART_SHEET)
+
+    Dim r As Long, c As Long, n As Long
+    Dim sFrom As String, sTo As String
+
+    For r = SAVED_CHART_FIRST_ROW To SAVED_CHART_LAST_ROW
+        For c = 1 To 11
+            wsDestHarness.Cells(r, c).Value = wsSrc.Cells(r, c).Value
+        Next c
+
+        sFrom = Trim$(CStr(wsSrc.Cells(r, 1).Value))
+        sTo = Trim$(CStr(wsSrc.Cells(r, 9).Value))
+        If Len(sFrom) > 0 Or Len(sTo) > 0 Then n = n + 1
+
+        wsDestHarness.Cells(r, SAVED_COL_JOIN_FROM).Formula = _
+            "=IF(A" & r & "="""",""""," & "A" & r & "&""|""&B" & r & ")"
+        wsDestHarness.Cells(r, SAVED_COL_JOIN_TO).Formula = _
+            "=IF(I" & r & "="""",""""," & "I" & r & "&""|""&J" & r & ")"
+    Next r
+
+    wsDestHarness.Columns(SAVED_COL_JOIN_FROM).Hidden = True
+    wsDestHarness.Columns(SAVED_COL_JOIN_TO).Hidden = True
+
+    CopyChartRows = n
 End Function
