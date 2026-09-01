@@ -1,4 +1,5 @@
 from tests.conftest import run
+from tests.fixtures.sample_photo import write_sample_photo
 
 
 def test_build_harness_sheets_creates_harness_and_snapshot(wb, app):
@@ -112,5 +113,38 @@ def test_copy_chart_rows_writes_live_join_key_formulas(wb, app):
         # this is what makes 3c's pin tables react to it with no macro.
         ws.Cells(7, 2).Value = 9
         assert ws.Cells(7, 12).Value == "J1|9"
+    finally:
+        dest.Close(SaveChanges=False)
+
+
+def test_copy_snapshot_round_trips_connectors_pins_and_photos(wb, app, tmp_path):
+    wsSnap = wb.Worksheets("_Snapshot")
+    fields = (
+        "DTM-04P", "Deutsch DTM 4-way", "Deutsch", "DTM06-4S", "Connector",
+        4, "", "PHOTO_DTM-04P", "2026-08-26T00:00:00Z", "2026-08-26T00:00:00Z", "Local",
+    )
+    run(wb, "modLibrary.WriteConnector", wsSnap, 2, 201, fields)
+    run(wb, "modLibrary.WritePin", wsSnap, 211, 2210, ("DTM-04P", 1, "+12V", 0.1, 0.1, 0.1, 0.1))
+    photo_path = write_sample_photo(tmp_path / "photo.png")
+    run(wb, "modLibrary.EmbedConnectorPhoto", wsSnap, "DTM-04P", str(photo_path))
+
+    # Excel's COM Value property always reads numbers back as float (4 -> 4.0)
+    # and an empty string written to a cell reads back as None (Excel treats
+    # "" as clearing the cell to blank) - see test_library_connectors.py.
+    fields_round_tripped = fields[:5] + (4.0, None) + fields[7:]
+
+    dest = app.Workbooks.Add()
+    try:
+        run(wb, "modHarnessBuild.BuildHarnessSheets", dest)
+        run(wb, "modHarnessBuild.CopySnapshot", dest.Worksheets("_Snapshot"))
+
+        wsDest = dest.Worksheets("_Snapshot")
+        result = run(wb, "modLibrary.ReadConnector", wsDest, 2, 201, "DTM-04P")
+        assert tuple(result) == fields_round_tripped
+
+        pins = run(wb, "modLibrary.ReadPinsForConnector", wsDest, 211, 2210, "DTM-04P")
+        assert [int(row[1]) for row in pins] == [1]
+
+        assert wsDest.Shapes("PHOTO_DTM-04P").Name == "PHOTO_DTM-04P"
     finally:
         dest.Close(SaveChanges=False)

@@ -88,3 +88,29 @@ Public Function CopyChartRows(wsDestHarness As Worksheet) As Long
 
     CopyChartRows = n
 End Function
+
+Public Sub CopySnapshot(wsDestSnapshot As Worksheet)
+    Dim wsSrc As Worksheet
+    Set wsSrc = ThisWorkbook.Worksheets("_Snapshot")
+
+    Dim r As Long, c As Long
+
+    For r = modSnapshot.SNAP_CONN_FIRST_ROW To modSnapshot.SNAP_CONN_LAST_ROW
+        For c = 1 To modLibrary.LIB_FIELD_COUNT
+            wsDestSnapshot.Cells(r, c).Value = wsSrc.Cells(r, c).Value
+        Next c
+    Next r
+
+    For r = modSnapshot.SNAP_PINS_FIRST_ROW To modSnapshot.SNAP_PINS_LAST_ROW
+        For c = 1 To modLibrary.PIN_FIELD_COUNT
+            wsDestSnapshot.Cells(r, c).Value = wsSrc.Cells(r, c).Value
+        Next c
+    Next r
+
+    Dim shp As Shape
+    For Each shp In wsSrc.Shapes
+        shp.Copy
+        wsDestSnapshot.Paste
+        wsDestSnapshot.Shapes(wsDestSnapshot.Shapes.Count).Name = shp.Name
+    Next shp
+End Sub
