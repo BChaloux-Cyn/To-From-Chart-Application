@@ -12,10 +12,15 @@ Public Function SaveHarness(destWb As Workbook) As Variant
     Set wsSnapshot = destWb.Worksheets("_Snapshot")
 
     modHarnessBuild.CopyTitleBlock wsHarness
+    Dim sHarnessNumber As String, sRevision As String
+    sHarnessNumber = CStr(wsHarness.Range("E2").Value)
+    sRevision = CStr(wsHarness.Range("H2").Value)
+
     Dim nUsedRows As Long
     nUsedRows = modHarnessBuild.CopyChartRows(wsHarness)
     modHarnessBuild.CopySnapshot wsSnapshot
-    modHarnessBuild.BuildConnectorPages destWb, wsSnapshot
+    modHarnessBuild.BuildConnectorPages destWb, wsSnapshot, sHarnessNumber, sRevision
+    modPageSetup.ApplyHarnessPageSetup wsHarness, sHarnessNumber, sRevision
 
     SaveHarness = modContract.Success("HARNESS_SAVED", nUsedRows)
 End Function

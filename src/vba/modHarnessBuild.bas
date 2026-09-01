@@ -123,7 +123,8 @@ Public Sub CopySnapshot(wsDestSnapshot As Worksheet)
     Next shp
 End Sub
 
-Public Sub BuildConnectorPages(destWb As Workbook, wsSnapshot As Worksheet)
+Public Sub BuildConnectorPages(destWb As Workbook, wsSnapshot As Worksheet, _
+                               ByVal sHarnessNumber As String, ByVal sRevision As String)
     Dim vInstances As Variant, i As Long
     Dim sRefDes As String, sConnectorID As String
     Dim wsPage As Worksheet, vPins As Variant, shpPhoto As Shape
@@ -152,5 +153,6 @@ Public Sub BuildConnectorPages(destWb As Workbook, wsSnapshot As Worksheet)
         modConnectorPage.WriteTableSkeleton wsPage, vPins
         modConnectorPage.WriteLiveFormulas wsPage, sRefDes, vPins
         modConnectorPage.WriteMetadata wsPage, sConnectorID
+        modPageSetup.ApplyConnectorPageSetup wsPage, sHarnessNumber, sRevision
     Next i
 End Sub

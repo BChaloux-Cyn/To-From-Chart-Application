@@ -181,7 +181,7 @@ def test_build_connector_pages_creates_one_sheet_per_instance(wb, app, tmp_path)
     try:
         run(wb, "modHarnessBuild.BuildHarnessSheets", dest)
         run(wb, "modHarnessBuild.CopySnapshot", dest.Worksheets("_Snapshot"))
-        run(wb, "modHarnessBuild.BuildConnectorPages", dest, dest.Worksheets("_Snapshot"))
+        run(wb, "modHarnessBuild.BuildConnectorPages", dest, dest.Worksheets("_Snapshot"), "HN-100", "A")
 
         page = dest.Worksheets("CONN_J1")
         assert page.Cells(1, 27).Value == "DTM-04P"
