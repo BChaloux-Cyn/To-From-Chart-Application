@@ -20,6 +20,21 @@ def test_full_harness_round_trips_through_a_saved_file(wb, app, tmp_path):
     wsHarness.Cells(7, 9).Value = "J2"
     wsHarness.Cells(7, 10).Value = 1
 
+    # A second wired row, on a third (shared) pin, that intentionally leaves
+    # Color and To Pin blank - proves Finding 1: a matched-but-blank field
+    # renders blank rather than 0 (LookupFormula) or a partial dash
+    # (WireToFormula), without needing a whole new connector.
+    wsHarness.Cells(8, 1).Value = "J1"
+    wsHarness.Cells(8, 2).Value = 3
+    wsHarness.Cells(8, 3).Value = "Crimp Pin"
+    wsHarness.Cells(8, 4).Value = "SIG3"
+    wsHarness.Cells(8, 5).Value = ""            # Color intentionally blank
+    wsHarness.Cells(8, 6).Value = "22"
+    wsHarness.Cells(8, 7).Value = 30
+    wsHarness.Cells(8, 8).Value = "Ring Terminal"
+    wsHarness.Cells(8, 9).Value = "J2"
+    wsHarness.Cells(8, 10).Value = ""           # To Pin intentionally blank
+
     wsSnap = wb.Worksheets("_Snapshot")
     fields = (
         "DTM-04P", "Deutsch DTM 4-way", "Deutsch", "DTM06-4S", "Connector",
@@ -44,6 +59,7 @@ def test_full_harness_round_trips_through_a_saved_file(wb, app, tmp_path):
     wsConn.Cells(3, 6).Value = 4
 
     run(wb, "modLibrary.WritePin", wsSnap, 211, 2210, ("DTM-04P", 2, "GND", 0.9, 0.1, 0.9, 0.1))
+    run(wb, "modLibrary.WritePin", wsSnap, 211, 2210, ("DTM-04P", 3, "SIG3", 0.5, 0.5, 0.5, 0.5))
 
     # BuildConnectorPages looks in LibraryFolder() (ThisWorkbook.Path, not
     # tmp_path) for the photo cache - a real path alongside the built
@@ -99,12 +115,21 @@ def test_full_harness_round_trips_through_a_saved_file(wb, app, tmp_path):
         assert j1.Cells(2, 17).Value == 24           # Length
         assert j1.Cells(2, 12).Value == "J2-1"      # Wire To, matched as From
         assert j1.Cells(3, 12).Value == ""          # pin 2, unwired: blank, not an error
+        assert j1.Cells(3, 13).Value == ""          # pin 2, unwired: LookupFormula-driven column also blank
 
         j2 = reopened.Worksheets("CONN_J2")
         assert j2.Cells(2, 13).Value == "12V_SW"    # same wire, matched as To this time
         assert j2.Cells(2, 12).Value == "J1-1"      # Wire To points back at J1
+        assert j2.Cells(2, 15).Value == 18           # AWG, matched as To
+        assert j2.Cells(2, 17).Value == 24           # Length, matched as To
         assert j1.Cells(2, 16).Value == "Crimp Pin"       # From side sees From Term
         assert j2.Cells(2, 16).Value == "Ring Terminal"   # To side sees To Term
+
+        # Finding 1: a matched-but-blank field renders blank, not 0 or a
+        # partial dash. Pin 3 is wired (J1 pin 3 -> J2 pin 3) with Color and
+        # To Pin intentionally left blank on the chart row.
+        assert j1.Cells(4, 14).Value == ""   # Color: LookupFormula-driven, matched but blank -> not 0
+        assert j1.Cells(4, 12).Value == ""   # Wire To: To Pin blank -> not a partial "J2-" dash
 
         assert reopened.HasVBProject is False  # macro-free
 
