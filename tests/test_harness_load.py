@@ -1,4 +1,4 @@
-from tests.conftest import run
+from tests.conftest import run, run_action
 from tests.fixtures.sample_photo import write_sample_photo
 
 
@@ -98,5 +98,58 @@ def test_rebuild_connector_instances_reads_ref_des_from_sheet_names(wb, app, tmp
         assert wsDestConn.Cells(2, 2).Value == "DTM-04P"
         assert wsDestConn.Cells(2, 3).Value == "Deutsch DTM 4-way"
         assert int(wsDestConn.Cells(2, 6).Value) == 4
+    finally:
+        srcWb.Close(SaveChanges=False)
+
+
+def test_load_harness_rejects_a_file_with_no_harness_sheet(wb, app):
+    srcWb = app.Workbooks.Add()
+    try:
+        result = run_action(wb, "modHarnessActions.LoadHarness", srcWb)
+        assert result.ok is False
+        assert result.outcome == "HARNESS_LOAD_FAILED"
+    finally:
+        srcWb.Close(SaveChanges=False)
+
+
+def test_load_harness_reconstructs_creator_state(wb, app, tmp_path):
+    srcWb = app.Workbooks.Add()
+    try:
+        run(wb, "modHarnessBuild.BuildHarnessSheets", srcWb)
+        wsSrcHarness = srcWb.Worksheets("Harness")
+        wsSrcHarness.Range("B2").Value = "Loaded Harness"
+        wsSrcHarness.Range("E2").Value = "HN-300"
+        wsSrcHarness.Cells(7, 1).Value = "J1"
+        wsSrcHarness.Cells(7, 2).Value = 1
+        wsSrcHarness.Cells(7, 9).Value = "J2"
+        wsSrcHarness.Cells(7, 10).Value = 1
+
+        wsSrcSnap = srcWb.Worksheets("_Snapshot")
+        fields = ("DTM-04P", "Deutsch DTM 4-way", "Deutsch", "DTM06-4S", "Connector",
+                  4, "", "PHOTO_DTM-04P", "2026-08-26T00:00:00Z", "2026-08-26T00:00:00Z", "Local")
+        run(wb, "modLibrary.WriteConnector", wsSrcSnap, 2, 201, fields)
+
+        page = srcWb.Worksheets.Add(After=srcWb.Worksheets(srcWb.Worksheets.Count))
+        page.Name = "CONN_J1"
+        run(wb, "modConnectorPage.WriteMetadata", page, "DTM-04P")
+
+        result = run_action(wb, "modHarnessActions.LoadHarness", srcWb)
+        assert result.ok is True
+        assert result.outcome == "HARNESS_LOADED"
+        assert result.payload == 1
+
+        wsDestHarness = wb.Worksheets("Harness")
+        assert wsDestHarness.Range("B2").Value == "Loaded Harness"
+        assert wsDestHarness.Cells(7, 1).Value == "J1"
+
+        wsDestConn = wb.Worksheets("Connectors")
+        assert wsDestConn.Cells(2, 1).Value == "J1"
+        assert wsDestConn.Cells(2, 2).Value == "DTM-04P"
+
+        # Pin dropdown validation rebuilt against the reconstructed Connectors sheet.
+        validation_formula = wsDestHarness.Cells(7, 2).Validation.Formula1
+        assert validation_formula == "1,2,3,4"
+
+        assert run(wb, "modState.GetState", "Dirty") == "FALSE"
     finally:
         srcWb.Close(SaveChanges=False)
