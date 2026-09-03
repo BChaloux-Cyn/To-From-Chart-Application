@@ -21,18 +21,28 @@ Private Function FooterText(ByVal sHarnessNumber As String, ByVal sRevision As S
     FooterText = Trim$(sHarnessNumber & " Rev " & sRevision) & " - Page &P of &N"
 End Function
 
+Private Sub ApplyNarrowMargins(ps As PageSetup)
+    ps.LeftMargin = Application.InchesToPoints(0.25)
+    ps.RightMargin = Application.InchesToPoints(0.25)
+    ps.TopMargin = Application.InchesToPoints(0.75)
+    ps.BottomMargin = Application.InchesToPoints(0.75)
+    ps.HeaderMargin = Application.InchesToPoints(0.3)
+    ps.FooterMargin = Application.InchesToPoints(0.3)
+End Sub
+
 Public Sub ApplyHarnessPageSetup(wsHarness As Worksheet, ByVal sHarnessNumber As String, ByVal sRevision As String)
     Dim nLastRow As Long
     nLastRow = LastUsedChartRow(wsHarness)
 
     With wsHarness.PageSetup
         .PrintArea = "$A$1:$K$" & CStr(nLastRow)
-        .PrintTitleRows = "$" & modHarnessBuild.SAVED_CHART_HEADER_ROW & ":$" & modHarnessBuild.SAVED_CHART_HEADER_ROW
+        .PrintTitleRows = "$1:$" & modHarnessBuild.SAVED_CHART_HEADER_ROW
         .Orientation = xlLandscape
         .FitToPagesWide = 1
         .FitToPagesTall = False
         .Zoom = False
         .CenterFooter = FooterText(sHarnessNumber, sRevision)
+        ApplyNarrowMargins wsHarness.PageSetup
     End With
 End Sub
 
@@ -47,10 +57,11 @@ Public Sub ApplyConnectorPageSetup(wsPage As Worksheet, ByVal sHarnessNumber As 
     With wsPage.PageSetup
         .PrintArea = "$A$1:$Q$" & CStr(LastUsedTableRow(wsPage))
         .PrintTitleRows = ""
-        .Orientation = xlPortrait
+        .Orientation = xlLandscape
         .FitToPagesWide = 1
         .FitToPagesTall = 1
         .Zoom = False
         .CenterFooter = FooterText(sHarnessNumber, sRevision)
+        ApplyNarrowMargins wsPage.PageSetup
     End With
 End Sub

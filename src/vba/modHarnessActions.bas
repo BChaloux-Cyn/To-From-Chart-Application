@@ -18,6 +18,7 @@ Public Function SaveHarness(destWb As Workbook) As Variant
 
     Dim nUsedRows As Long
     nUsedRows = modHarnessBuild.CopyChartRows(wsHarness)
+    modHarnessBuild.CopyChartValidation destWb
     modHarnessBuild.CopySnapshot wsSnapshot
     modHarnessBuild.BuildConnectorPages destWb, wsSnapshot, sHarnessNumber, sRevision
     modPageSetup.ApplyHarnessPageSetup wsHarness, sHarnessNumber, sRevision

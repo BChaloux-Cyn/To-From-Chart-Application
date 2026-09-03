@@ -12,6 +12,9 @@ Public Const CONN_TABLE_FIRST_ROW As Long = 2
 Public Const CONN_OVAL_DIAMETER As Double = 14
 
 Private Const MSO_SHAPE_OVAL As Long = 9
+Private Const MSO_ALIGN_CENTER As Long = 2
+Private Const MSO_ANCHOR_MIDDLE As Long = 3
+Private Const MSO_TRUE As Long = -1
 Private Const TABLE_HEADERS As String = "Pin,Label,Wire To,Signal,Color,AWG,Termination,Length"
 
 Public Function PagePhotoPath(ByVal sLibraryFolder As String, ByVal sConnectorID As String) As String
@@ -81,6 +84,14 @@ Public Function PlaceCallouts(wsPage As Worksheet, shpPhoto As Shape, vPins As V
         shp.Line.ForeColor.RGB = RGB(0, 0, 0)
         shp.TextFrame2.TextRange.Text = CStr(nPinNumber)
         shp.TextFrame2.TextRange.Font.Size = 8
+        shp.TextFrame2.TextRange.Font.Fill.ForeColor.RGB = RGB(0, 0, 0)
+        shp.TextFrame2.TextRange.Font.Bold = MSO_TRUE
+        shp.TextFrame2.TextRange.ParagraphFormat.Alignment = MSO_ALIGN_CENTER
+        shp.TextFrame2.VerticalAnchor = MSO_ANCHOR_MIDDLE
+        shp.TextFrame2.MarginLeft = 0
+        shp.TextFrame2.MarginRight = 0
+        shp.TextFrame2.MarginTop = 0
+        shp.TextFrame2.MarginBottom = 0
         shp.TextFrame2.WordWrap = False
 
         n = n + 1
@@ -159,6 +170,23 @@ End Sub
 Public Sub WriteMetadata(wsPage As Worksheet, ByVal sConnectorID As String)
     wsPage.Cells(1, CONN_META_COL).Value = sConnectorID
     wsPage.Columns(CONN_META_COL).Hidden = True
+End Sub
+
+' Row 1, columns A:I sit above/beside the photo (Top:=CONN_PHOTO_TOP is well
+' below row 1's height) and left of the pin table (CONN_TABLE_FIRST_COL is
+' column J) - free space for a compact header so the harness/connector this
+' page belongs to is visible on every connector page, not just the Harness
+' sheet's own title block.
+Public Sub WritePageTitleBlock(wsPage As Worksheet, ByVal sHarnessNumber As String, _
+                                ByVal sRevision As String, ByVal sRefDes As String, _
+                                ByVal sConnectorID As String)
+    Dim rng As Range
+    Set rng = wsPage.Range("A1:I1")
+    rng.Merge
+    rng.Value = "Harness " & sHarnessNumber & "  Rev " & sRevision & _
+                "   -   " & sRefDes & " (" & sConnectorID & ")"
+    rng.Font.Bold = True
+    rng.Interior.Color = &HF2F2F2
 End Sub
 
 Private Function KeyExpr(ByVal sRefDes As String, ByVal nTableRow As Long) As String

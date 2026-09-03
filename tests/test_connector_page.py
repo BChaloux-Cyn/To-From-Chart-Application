@@ -69,6 +69,46 @@ def test_place_callouts_draws_one_oval_per_pin(wb, app, tmp_path):
         dest.Close(SaveChanges=False)
 
 
+def test_place_callouts_draws_black_text_on_the_white_oval(wb, app, tmp_path):
+    photo_path = write_sample_photo(tmp_path / "photo.png")
+    dest = app.Workbooks.Add()
+    try:
+        ws = dest.Worksheets(1)
+        run(wb, "modConnectorPage.PlacePhoto", ws, str(photo_path))
+        shp = ws.Shapes("PAGE_PHOTO")
+
+        pins = (("DTM-04P", 1, "+12V", 0.1, 0.1, 0.1, 0.1),)
+        run(wb, "modConnectorPage.PlaceCallouts", ws, shp, pins)
+
+        font_color = ws.Shapes("PIN_1").TextFrame2.TextRange.Font.Fill.ForeColor.RGB
+        assert font_color == 0
+    finally:
+        dest.Close(SaveChanges=False)
+
+
+def test_place_callouts_text_is_bold_and_centered_in_the_oval(wb, app, tmp_path):
+    photo_path = write_sample_photo(tmp_path / "photo.png")
+    dest = app.Workbooks.Add()
+    try:
+        ws = dest.Worksheets(1)
+        run(wb, "modConnectorPage.PlacePhoto", ws, str(photo_path))
+        shp = ws.Shapes("PAGE_PHOTO")
+
+        pins = (("DTM-04P", 1, "+12V", 0.1, 0.1, 0.1, 0.1),)
+        run(wb, "modConnectorPage.PlaceCallouts", ws, shp, pins)
+
+        tf = ws.Shapes("PIN_1").TextFrame2
+        assert tf.TextRange.Font.Bold == -1  # msoTrue
+        assert tf.TextRange.ParagraphFormat.Alignment == 2  # msoAlignCenter
+        assert tf.VerticalAnchor == 3  # msoAnchorMiddle
+        assert tf.MarginLeft == 0
+        assert tf.MarginRight == 0
+        assert tf.MarginTop == 0
+        assert tf.MarginBottom == 0
+    finally:
+        dest.Close(SaveChanges=False)
+
+
 def test_place_callouts_centers_the_oval_on_the_label_position(wb, app, tmp_path):
     photo_path = write_sample_photo(tmp_path / "photo.png")
     dest = app.Workbooks.Add()
@@ -139,6 +179,23 @@ def test_write_metadata_hides_the_connector_id_column(wb, app):
         run(wb, "modConnectorPage.WriteMetadata", ws, "DTM-04P")
         assert ws.Cells(1, 27).Value == "DTM-04P"
         assert ws.Columns(27).Hidden is True
+    finally:
+        dest.Close(SaveChanges=False)
+
+
+def test_write_page_title_block_shows_harness_and_connector_metadata(wb, app):
+    dest = app.Workbooks.Add()
+    try:
+        ws = dest.Worksheets(1)
+        run(wb, "modConnectorPage.WritePageTitleBlock", ws, "HN-100", "A", "J1", "DTM-04P")
+
+        title = ws.Range("A1")
+        assert "HN-100" in title.Value
+        assert "A" in title.Value
+        assert "J1" in title.Value
+        assert "DTM-04P" in title.Value
+        assert title.MergeCells is True
+        assert title.MergeArea.Address == "$A$1:$I$1"
     finally:
         dest.Close(SaveChanges=False)
 

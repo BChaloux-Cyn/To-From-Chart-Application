@@ -129,9 +129,13 @@ Public Sub NewHarness()
     wsHarness.Range(wsHarness.Cells(CHART_FIRST_ROW, COL_TO_PIN), _
                     wsHarness.Cells(CHART_LAST_ROW, COL_TO_PIN)).Validation.Delete
 
+    ' .MergeArea, not the bare named range: title-block value cells are
+    ' merged with a neighbor to hold long text (Harness Name, Description),
+    ' and Excel refuses ClearContents on a range that only covers part of a
+    ' merged cell, even when that range is the merge's own top-left anchor.
     vNames = Split(TB_CLEAR_NAMES, ",")
     For i = LBound(vNames) To UBound(vNames)
-        ThisWorkbook.Names(vNames(i)).RefersToRange.ClearContents
+        ThisWorkbook.Names(vNames(i)).RefersToRange.MergeArea.ClearContents
     Next i
 
     wsConn.Range(wsConn.Cells(modConnectors.CONN_FIRST_ROW, 1), _

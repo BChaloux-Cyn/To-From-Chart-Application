@@ -4,13 +4,13 @@ from tests.conftest import run
 from tests.fixtures.sample_photo import write_sample_photo
 
 
-def test_build_harness_sheets_creates_harness_and_snapshot(wb, app):
+def test_build_harness_sheets_creates_harness_snapshot_and_lists(wb, app):
     dest = app.Workbooks.Add()
     try:
         ok = run(wb, "modHarnessBuild.BuildHarnessSheets", dest)
         assert ok is True
         names = [dest.Worksheets(i + 1).Name for i in range(dest.Worksheets.Count)]
-        assert names == ["Harness", "_Snapshot"]
+        assert names == ["Harness", "_Snapshot", "_Lists"]
     finally:
         dest.Close(SaveChanges=False)
 
@@ -20,6 +20,15 @@ def test_snapshot_sheet_is_very_hidden(wb, app):
     try:
         run(wb, "modHarnessBuild.BuildHarnessSheets", dest)
         assert dest.Worksheets("_Snapshot").Visible == 2  # xlSheetVeryHidden
+    finally:
+        dest.Close(SaveChanges=False)
+
+
+def test_lists_sheet_is_very_hidden(wb, app):
+    dest = app.Workbooks.Add()
+    try:
+        run(wb, "modHarnessBuild.BuildHarnessSheets", dest)
+        assert dest.Worksheets("_Lists").Visible == 2  # xlSheetVeryHidden
     finally:
         dest.Close(SaveChanges=False)
 
@@ -62,6 +71,62 @@ def test_copy_title_block_round_trips_every_field(wb, app):
         assert ws.Range("H4").Value == "in"
         assert ws.Range("A1").Value == "WIRE HARNESS TO-FROM CHART"
         assert ws.Cells(6, 1).Value == "From Conn"  # chart header row rendered
+
+        expected_labels = {
+            "A2": "Harness Name", "D2": "Harness Number", "G2": "Revision",
+            "A3": "Student", "D3": "Class / Project", "G3": "Date",
+            "A4": "Description", "G4": "Length Units",
+        }
+        for cell, label in expected_labels.items():
+            assert ws.Range(cell).Value == label
+            assert ws.Range(cell).Font.Bold is True
+    finally:
+        dest.Close(SaveChanges=False)
+
+
+XL_CONTINUOUS = 1
+XL_EDGE_LEFT = 7
+XL_EDGE_TOP = 8
+XL_EDGE_BOTTOM = 9
+XL_EDGE_RIGHT = 10
+
+
+def test_copy_title_block_borders_and_widens_label_columns(wb, app):
+    _fill_title_block(wb)
+    dest = app.Workbooks.Add()
+    try:
+        run(wb, "modHarnessBuild.BuildHarnessSheets", dest)
+        run(wb, "modHarnessBuild.CopyTitleBlock", dest.Worksheets("Harness"))
+        ws = dest.Worksheets("Harness")
+
+        for cell in ("B2", "E2", "H2", "B3", "E3", "H3", "B4", "H4"):
+            borders = ws.Range(cell).MergeArea.Borders
+            for edge in (XL_EDGE_LEFT, XL_EDGE_TOP, XL_EDGE_RIGHT, XL_EDGE_BOTTOM):
+                assert borders(edge).LineStyle == XL_CONTINUOUS
+
+        assert ws.Columns(1).ColumnWidth >= 14  # "Harness Name" / "Description" fit
+        assert ws.Columns(7).ColumnWidth >= 13  # "Length Units" fits
+    finally:
+        dest.Close(SaveChanges=False)
+
+
+def test_copy_title_block_widens_long_value_cells_with_a_merge(wb, app):
+    _fill_title_block(wb)
+    dest = app.Workbooks.Add()
+    try:
+        run(wb, "modHarnessBuild.BuildHarnessSheets", dest)
+        run(wb, "modHarnessBuild.CopyTitleBlock", dest.Worksheets("Harness"))
+        ws = dest.Worksheets("Harness")
+
+        for cell, span in (
+            ("B2", "$B$2:$C$2"), ("E2", "$E$2:$F$2"), ("H2", "$H$2:$I$2"),
+            ("B3", "$B$3:$C$3"), ("E3", "$E$3:$F$3"), ("H3", "$H$3:$I$3"),
+            ("B4", "$B$4:$F$4"),
+        ):
+            assert ws.Range(cell).MergeCells is True
+            assert ws.Range(cell).MergeArea.Address == span
+
+        assert ws.Range("H4").MergeCells is False  # short controlled value, left as-is
     finally:
         dest.Close(SaveChanges=False)
 
@@ -115,6 +180,60 @@ def test_copy_chart_rows_writes_live_join_key_formulas(wb, app):
         # this is what makes 3c's pin tables react to it with no macro.
         ws.Cells(7, 2).Value = 9
         assert ws.Cells(7, 12).Value == "J1|9"
+    finally:
+        dest.Close(SaveChanges=False)
+
+
+XL_VALIDATE_LIST = 3
+
+# (column index, Formula1) - Color, AWG, and Termination (From Term/To Term)
+# are the only chart columns with dropdown validation in the Creator
+# (test_validation.py's EXPECTED); this is what CopyChartValidation carries
+# into the saved harness. From/To Conn and From/To Pin dropdowns are
+# per-harness-dynamic (modChart.RebuildPinValidation) and out of scope here.
+VALIDATED_COLUMNS = [
+    (3, "=ListTermination"),
+    (5, "=ListColor"),
+    (6, "=ListAWG"),
+    (8, "=ListTermination"),
+]
+
+
+def test_copy_chart_validation_matches_the_creators_dropdowns(wb, app):
+    dest = app.Workbooks.Add()
+    try:
+        run(wb, "modHarnessBuild.BuildHarnessSheets", dest)
+        run(wb, "modHarnessBuild.CopyChartValidation", dest)
+
+        ws = dest.Worksheets("Harness")
+        for column, formula in VALIDATED_COLUMNS:
+            first = ws.Cells(7, column)
+            last = ws.Cells(1006, column)
+            assert first.Validation.Type == XL_VALIDATE_LIST
+            assert first.Validation.Formula1 == formula
+            assert last.Validation.Type == XL_VALIDATE_LIST
+            assert last.Validation.Formula1 == formula
+    finally:
+        dest.Close(SaveChanges=False)
+
+
+def test_copy_chart_validation_lists_resolve_to_the_creators_values(wb, app):
+    dest = app.Workbooks.Add()
+    try:
+        run(wb, "modHarnessBuild.BuildHarnessSheets", dest)
+        run(wb, "modHarnessBuild.CopyChartValidation", dest)
+
+        src_colors = wb.Names("ListColor").RefersToRange.Value
+        dest_colors = dest.Names("ListColor").RefersToRange.Value
+        assert dest_colors == src_colors
+
+        src_awg = wb.Names("ListAWG").RefersToRange.Value
+        dest_awg = dest.Names("ListAWG").RefersToRange.Value
+        assert dest_awg == src_awg
+
+        src_term = wb.Names("ListTermination").RefersToRange.Value
+        dest_term = dest.Names("ListTermination").RefersToRange.Value
+        assert dest_term == src_term
     finally:
         dest.Close(SaveChanges=False)
 
@@ -187,6 +306,13 @@ def test_build_connector_pages_creates_one_sheet_per_instance(wb, app, tmp_path)
         assert page.Cells(1, 27).Value == "DTM-04P"
         assert page.Cells(1, 10).Value == "Pin"
         assert page.Shapes.Count >= 2  # at least the two ovals
+
+        title = page.Range("A1")
+        assert "HN-100" in title.Value
+        assert "A" in title.Value
+        assert "J1" in title.Value
+        assert "DTM-04P" in title.Value
+        assert title.MergeArea.Address == "$A$1:$I$1"
     finally:
         dest.Close(SaveChanges=False)
         cache_path.unlink(missing_ok=True)

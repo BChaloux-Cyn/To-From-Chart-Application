@@ -1,7 +1,12 @@
+import pytest
+
 from tests.conftest import run
 
 XL_LANDSCAPE = 2
 XL_PORTRAIT = 1
+
+NARROW_LEFT_RIGHT_IN = 0.25
+NARROW_TOP_BOTTOM_IN = 0.75
 
 
 def test_last_used_chart_row_finds_the_last_populated_row(wb, app):
@@ -42,10 +47,14 @@ def test_apply_harness_page_setup(wb, app):
         assert ps.Orientation == XL_LANDSCAPE
         assert ps.FitToPagesWide == 1
         assert ps.PrintArea == "$A$1:$K$7"
-        assert ps.PrintTitleRows == "$6:$6"
+        assert ps.PrintTitleRows == "$1:$6"  # title block repeats on overflow pages too
         assert "HN-100" in ps.CenterFooter
         assert "A" in ps.CenterFooter
         assert "&P" in ps.CenterFooter and "&N" in ps.CenterFooter
+        assert ps.LeftMargin == pytest.approx(app.InchesToPoints(NARROW_LEFT_RIGHT_IN))
+        assert ps.RightMargin == pytest.approx(app.InchesToPoints(NARROW_LEFT_RIGHT_IN))
+        assert ps.TopMargin == pytest.approx(app.InchesToPoints(NARROW_TOP_BOTTOM_IN))
+        assert ps.BottomMargin == pytest.approx(app.InchesToPoints(NARROW_TOP_BOTTOM_IN))
     finally:
         dest.Close(SaveChanges=False)
 
@@ -60,12 +69,16 @@ def test_apply_connector_page_setup(wb, app):
         run(wb, "modPageSetup.ApplyConnectorPageSetup", ws, "HN-100", "A")
 
         ps = ws.PageSetup
-        assert ps.Orientation == XL_PORTRAIT
+        assert ps.Orientation == XL_LANDSCAPE
         assert ps.FitToPagesWide == 1
         assert ps.FitToPagesTall == 1
         assert ps.PrintArea == "$A$1:$Q$30"
         assert ps.PrintTitleRows == ""
         assert "HN-100" in ps.CenterFooter
+        assert ps.LeftMargin == pytest.approx(app.InchesToPoints(NARROW_LEFT_RIGHT_IN))
+        assert ps.RightMargin == pytest.approx(app.InchesToPoints(NARROW_LEFT_RIGHT_IN))
+        assert ps.TopMargin == pytest.approx(app.InchesToPoints(NARROW_TOP_BOTTOM_IN))
+        assert ps.BottomMargin == pytest.approx(app.InchesToPoints(NARROW_TOP_BOTTOM_IN))
     finally:
         dest.Close(SaveChanges=False)
 

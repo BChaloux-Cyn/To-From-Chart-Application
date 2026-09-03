@@ -107,7 +107,10 @@ CHART_HEADERS = [
     "Length (in)", "To Term", "To Conn", "To Pin", "Notes",
 ]
 
-CHART_COLUMN_WIDTHS = [11, 9, 15, 18, 13, 7, 12, 15, 11, 9, 30]
+# A and G are widened past their chart-only sizing so the title-block labels
+# that also live in those columns (Harness Name/Description; Length Units)
+# don't clip.
+CHART_COLUMN_WIDTHS = [14, 9, 15, 18, 13, 7, 13, 15, 11, 9, 30]
 
 # (label text, label cell, value cell)
 TITLE_BLOCK = [
@@ -120,6 +123,20 @@ TITLE_BLOCK = [
     ("Description", "A4", "B4"),
     ("Length Units", "G4", "H4"),
 ]
+
+# Widens each free-text title-block value past its single narrow chart-grid
+# column so the gray fill (and the text) doesn't stop short when a value -
+# Harness Name and Description especially - is longer than one column.
+# H4 (Length Units) is a short controlled value and is left unmerged.
+TB_MERGE_SPANS = {
+    "B2": "C2",
+    "E2": "F2",
+    "H2": "I2",
+    "B3": "C3",
+    "E3": "F3",
+    "H3": "I3",
+    "B4": "F4",
+}
 
 TB_NAMES = {
     "TB_Name": "B2",
@@ -135,6 +152,8 @@ TB_NAMES = {
 XL_VALIDATE_LIST = 3
 XL_VALID_ALERT_STOP = 1
 XL_BETWEEN = 1
+XL_CONTINUOUS = 1
+XL_THIN = 2
 
 
 def build_harness(sheets) -> None:
@@ -147,7 +166,15 @@ def build_harness(sheets) -> None:
     for label, label_cell, value_cell in TITLE_BLOCK:
         sheet.Range(label_cell).Value = label
         sheet.Range(label_cell).Font.Bold = True
-        sheet.Range(value_cell).Interior.Color = 0xF2F2F2
+
+        span = TB_MERGE_SPANS.get(value_cell)
+        value_range = sheet.Range(f"{value_cell}:{span}") if span else sheet.Range(value_cell)
+        value_range.Interior.Color = 0xF2F2F2
+        if span:
+            value_range.Merge()
+        value_range.Borders.LineStyle = XL_CONTINUOUS
+        value_range.Borders.Weight = XL_THIN
+        value_range.Borders.Color = 0x000000
 
     sheet.Range(TB_NAMES["TB_Units"]).Value = "in"
     units = sheet.Range(TB_NAMES["TB_Units"]).Validation
